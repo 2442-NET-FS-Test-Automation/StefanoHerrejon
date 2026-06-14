@@ -147,7 +147,57 @@ public class Program
 
     public static void Sell(List<Product> products)
     {
+        
+        int numProduct;
+        int soldUnits = 0;
         Console.WriteLine("Option 3: Sell a Product");
+        Console.WriteLine("Which product do you want to sell? Input in number of product.");
+        ListProducts(products);
+
+        try
+        {
+            numProduct = Convert.ToInt32(Console.ReadLine());
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine(e.Message);
+            numProduct = 0;
+        }
+
+        if(numProduct != 0)
+        {
+            int newProducts = 0;
+            Console.WriteLine("Number of sold units:");
+            try
+            {
+                newProducts = Convert.ToInt32(Console.ReadLine());
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+                newProducts = 0;
+            }
+
+            for(int i = 0; i < products.Count; i++)
+            {
+                if(i+1 == numProduct)
+                {
+                    if(products[i] is Cloths cloth)
+                    {
+                        soldUnits = cloth.Sell(newProducts);
+                    }
+                    else if(products[i] is Food food)
+                    {
+                        soldUnits = food.Sell(newProducts);
+                    }
+
+                    Console.WriteLine($"New stock is : {soldUnits}");
+                }
+                
+            }
+        }
+
+        
     }
 
     public static void ListProducts(List<Product> list)
