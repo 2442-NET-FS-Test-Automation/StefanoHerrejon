@@ -170,7 +170,7 @@ public class Program
         int numProduct;
         int newUnits = 0;
         Console.WriteLine("Option 2: Restock a Product");
-        Console.WriteLine("Which product do you want to restock? Input in number of product.");
+        Console.WriteLine("Which product do you want to restock? Input product id");
         ListProducts(products);
 
         try
@@ -183,7 +183,7 @@ public class Program
             numProduct = 0;
         }
 
-        if(numProduct != 0)
+        if(numProduct != 0 && numProduct < products.Count)
         {
             int newProducts = 0;
             Console.WriteLine("Number of new products:");
@@ -215,8 +215,10 @@ public class Program
                 
             }
         }
-
-
+        else
+        {
+            Console.WriteLine($"{numProduct} is not a valid id");
+        }
     }
 
     public static void Sell(List<Product> products)
@@ -225,7 +227,7 @@ public class Program
         int numProduct;
         int soldUnits = 0;
         Console.WriteLine("Option 3: Sell a Product");
-        Console.WriteLine("Which product do you want to sell? Input in number of product.");
+        Console.WriteLine("Which product do you want to sell? Input product id");
         ListProducts(products);
 
         try
@@ -238,7 +240,7 @@ public class Program
             numProduct = 0;
         }
 
-        if(numProduct != 0)
+        if(numProduct != 0 && numProduct < products.Count)
         {
             int newProducts = 0;
             Console.WriteLine("Number of sold units:");
@@ -269,6 +271,10 @@ public class Program
                 }
                 
             }
+        }
+        else
+        {
+            Console.WriteLine($"{numProduct} is not a valir product id");
         }
 
         
