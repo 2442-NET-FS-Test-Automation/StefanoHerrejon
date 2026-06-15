@@ -31,7 +31,7 @@ public class Program
             + "\n\t4) List"
             + "\n\t5) Exit");
 
-            Console.Write("Ingresa un número: ");
+            Console.Write("Operation #: ");
             try
             {
                 numero = Convert.ToInt32(Console.ReadLine());
@@ -84,7 +84,7 @@ public class Program
     public static void AddProduct(List<Product> products)
     {
         Console.WriteLine("Option 1: Add New Product");
-        Console.WriteLine("What product do you want to add? \n1) Food \n2) Clothes");
+        Console.WriteLine("What product do you want to add? \n1) Food \n2) Cloth");
 
         int opcion = 0;
         try
@@ -277,11 +277,10 @@ public class Program
     public static void ListProducts(List<Product> list)
     {
         Console.WriteLine("Option 4: List all Products");
-        int x = 0;
         for(int i = 0; i < list.Count; i++)
         {
-            x = i+1;
-            Console.WriteLine(x + $") {list[i]}");
+            
+            Console.WriteLine(list[i]);
         }
     }
 
