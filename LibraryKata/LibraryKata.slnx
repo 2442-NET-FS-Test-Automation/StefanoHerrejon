@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Library.Domain/Library.Domain.csproj" />
+  <Project Path="LibraryKata.App/LibraryKata.App.csproj" />
+</Solution>
