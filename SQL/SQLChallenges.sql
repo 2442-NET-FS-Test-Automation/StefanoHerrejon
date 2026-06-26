@@ -207,7 +207,20 @@ WHERE ArtistId IN (90,150,50)
 
 -- Which customers have the same initials as at least one other customer?
 
-
+ SELECT
+    CustomerId,
+    FirstName,
+    LastName
+FROM dbo.Customer 
+WHERE CONCAT(LEFT(FirstName, 1), LEFT(LastName, 1)) IN
+(
+    SELECT
+        CONCAT(LEFT(FirstName, 1), LEFT(LastName, 1))
+    FROM dbo.Customer
+    GROUP BY CONCAT(LEFT(FirstName, 1), LEFT(LastName, 1))
+    HAVING COUNT(*) > 1
+)
+ORDER BY LastName, FirstName;
 
 -- Which countries have the most invoices?
 
@@ -257,14 +270,31 @@ GROUP BY c.Email, c.FirstName ,c.LastName
 
 -- Which artist has written the most Rock songs?
 
-SELECT
-    *
+SELECT TOP 1
+    a.ArtistId,
+    a.NAME,
+    COUNT(*) as RockSongs
 FROM dbo.Artist a
+JOIN dbo.Album al ON a.ArtistId = al.ArtistId
+JOIN dbo.Track t ON al.AlbumId = t.AlbumId
+JOIN dbo.Genre g ON g.GenreId = t.GenreId
+WHERE g.Name = 'Rock'
+GROUP BY a.ArtistId, a.Name
+ORDER BY RockSongs DESC; 
 
 -- Which artist has generated the most revenue?
 
+SELECT TOP 1
+    a.ArtistId,
+    a.NAME,
+    SUM(il.UnitPrice*il.Quantity) as Revenue
 
-
+FROM dbo.Artist a
+JOIN dbo.Album al ON a.ArtistId = al.ArtistId
+JOIN dbo.Track t ON al.AlbumId = t.AlbumId
+JOIN dbo.InvoiceLine il ON il.TrackId = t.TrackId
+GROUP BY a.ArtistId, a.Name
+ORDER BY Revenue DESC
 
 -- ADVANCED CHALLENGES
 -- solve these with a mixture of joins, subqueries, CTE, and set operators.
@@ -273,36 +303,125 @@ FROM dbo.Artist a
 
 -- 1. which artists did not make any albums at all?
 
+SELECT 
+    *
+FROM dbo.Artist ar
+LEFT JOIN dbo.Album al ON al.ArtistId = ar.ArtistId
+WHERE al.AlbumId is NULL
 
 -- 2. which artists did not record any tracks of the Latin genre?
 
 
+SELECT 
+    ar.ArtistId,
+    ar.Name
+FROM dbo.Artist ar
+LEFT JOIN dbo.Album al ON al.ArtistId = ar.ArtistId
+LEFT JOIN dbo.Track t ON t.AlbumId = al.AlbumId
+LEFT JOIN dbo.Genre g ON t.GenreId = g.GenreId
+WHERE g.Name != 'Latin'
+GROUP BY ar.ArtistId, ar.Name
+
+
 -- 3. which video track has the longest length? (use media type table)
 
+SELECT TOP 1
+    t.TrackId,
+    t.Name,
+    t.Milliseconds / 1000 AS Seconds
+FROM dbo.Track t
+WHERE t.MediaTypeId = 3 -- Protected MPEG-4 video file
+ORDER BY Milliseconds DESC
 
 
 -- 4. boss employee (the one who reports to nobody)
 
+SELECT  
+    *
+FROM dbo.Employee
+WHERE ReportsTo IS NULL
 
 -- 5. how many audio tracks were bought by German customers, and what was
 --    the total price paid for them?
 
-
+SELECT 
+    COUNT(*) as COUNT,
+    SUM(il.Quantity*il.UnitPrice) as TotalPrice
+FROM InvoiceLine il
+JOIN Invoice i ON il.InvoiceId = i.InvoiceId
+JOIN Customer c on i.CustomerId = c.CustomerId
+WHERE C.Country = 'Germany'
+GROUP BY C.Country
 
 -- 6. list the names and countries of the customers supported by an employee
 --    who was hired younger than 35.
 
-
+SELECT
+    c.LastName + ' ' + c.LastName AS Name,
+    c.Country,
+    e.EmployeeId
+FROM Customer c
+JOIN Employee e ON c.SupportRepId = e.EmployeeId
+WHERE DATEDIFF(YEAR,E.BirthDate, e.HireDate) < 35
+ORDER BY c.SupportRepId;
 
 
 -- DML exercises
 
 -- 1. insert two new records into the employee table.
 
+INSERT INTO dbo.Employee(LastName, FirstName, Title, ReportsTo, BirthDate, HireDate, Address, City, Country, PostalCode, Phone, Fax, Email)
+VALUES('Stefano1', 'H', 'IT Manager', 1, CONVERT(date, '18-08-1992', 105), GETDATE(), 'Narnia ...', 'Monterrey', 'Mexico', 37140, +52477181000, +52477181000,'stefano@gmail.com'),
+('Laura', 'M', 'Sales Manager', 2, CONVERT(date, '15-03-1990', 105), GETDATE(), '123 Oak Street', 'Guadalajara', 'Mexico', 44100, +523312345678, +523312345678, 'laura.gomez@gmail.com');
+
+SELECT
+    *
+FROM dbo.Employee
+
 -- 2. insert two new records into the tracks table.
+
+INSERT INTO Track(Name, AlbumId, MediaTypeId, GenreId, Composer, Milliseconds, Bytes, UnitPrice)
+VALUES('StefanoAlbum', 1,1,2, 'Stefano', 1111, 12, 10.99),
+('ChavaAlbum',1,1,2,'Chava',2222,13,9.99);
+
+
+SELECT
+    *
+FROM MediaType;
 
 -- 3. update customer Aaron Mitchell's name to Robert Walter
 
+UPDATE Customer
+SET FirstName = 'Robert', LastName = 'Walter'
+WHERE FirstName = 'Aaron' AND LastName = 'Mitchell';
+
+SELECT  -- ID 32
+    *
+FROM Customer
+WHERE FirstName = 'Aaron' and LastName = 'Mitchell' ;
+SELECT  -- ID 32
+    *
+FROM Customer
+WHERE CustomerId = 32
+
 -- 4. delete one of the employees you inserted.
 
+DELETE FROM Employee
+WHERE EmployeeId = 10
+
+SELECT
+    *
+FROM Employee 
+WHERE LastName = 'Stefano1'
 -- 5. delete customer Robert Walter.
+
+DELETE FROM Customer
+WHERE FirstName = 'Robert' and LastName = 'Walter'
+/*
+M
+Started executing query at  Line 417
+Msg 547, Level 16, State 0, Line 418
+The DELETE statement conflicted with the REFERENCE constraint "FK_InvoiceCustomerId". The conflict occurred in database "Chinook_AutoIncrement", table "dbo.Invoice", column 'CustomerId'.
+The statement has been terminated.
+Total execution time: 00:00:00.027
+*/
