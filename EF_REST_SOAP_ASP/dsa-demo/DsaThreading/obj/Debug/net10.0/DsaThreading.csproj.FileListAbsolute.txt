@@ -1,0 +1,15 @@
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\bin\Debug\net10.0\DsaThreading.exe
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\bin\Debug\net10.0\DsaThreading.deps.json
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\bin\Debug\net10.0\DsaThreading.runtimeconfig.json
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\bin\Debug\net10.0\DsaThreading.dll
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\bin\Debug\net10.0\DsaThreading.pdb
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.GeneratedMSBuildEditorConfig.editorconfig
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.AssemblyInfoInputs.cache
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.AssemblyInfo.cs
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.csproj.CoreCompileInputs.cache
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.sourcelink.json
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.dll
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\refint\DsaThreading.dll
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.pdb
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\DsaThreading.genruntimeconfig.cache
+D:\RevatureCodigo\StefanoHerrejon\EF_REST_SOAP_ASP\dsa-demo\DsaThreading\obj\Debug\net10.0\ref\DsaThreading.dll
