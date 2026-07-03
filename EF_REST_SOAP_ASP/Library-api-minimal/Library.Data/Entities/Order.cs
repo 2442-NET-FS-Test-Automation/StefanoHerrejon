@@ -18,5 +18,5 @@ public class Order
 
     //Every Order has one or more OrderLines
     //OrderLines are the actual product and quantity of a something on the order
-    public List<OrderLines> OrderLines{get; set; } = new();
+    public List<OrderLines> Lines {get; set; } = new();
 }

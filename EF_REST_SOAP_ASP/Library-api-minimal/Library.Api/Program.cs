@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Library.Data;
 using Microsoft.Extensions.Options;
 using Library.Data.Entities;
+using Serilog;
+using Library.Api.Fulfillment;
+using Library.Data.Enums;
 
 //This is my API Program.cs
 //No main, we can think of it as 2 sections
@@ -15,11 +18,32 @@ var builder = WebApplication.CreateBuilder(args);
 //The first thing that we need is to five our builder a connection string to our database
 var conn_string ="Server=localhost,1433;Database=LibraryMinimalDb;User Id=sa; Password=LibraryPassword1; TrustServerCertificate=true";
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()//Write to console, and write to a file - starting a new file each day
+    .WriteTo.File("log/fullfillment-log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog(); //Tell the builder to use Serilog for logging
+
 //Tell the builder to use out LibraryDbContext with the connection string above
 //By registering our DbContext class (or even classes, technically you use one per DataBase)
 //we hand off the managing of creating and destroying these DBContext objects to ASP.NET's
 //dependency injection container. Like spring beans if you are familiar
-builder.Services.AddDbContext<LibraryDbContext>(options => options.UseSqlServer(conn_string));
+
+//ASP.NET has fwa different scocpe types
+//transient - a new insance is created every time it's required
+//Scoped - new instance for HTTP request
+//Sungleton - A single instance for the entire runtime of the app
+builder.Services.AddDbContext<LibraryDbContext>(options => options.UseSqlServer(conn_string),
+    ServiceLifetime.Scoped, ServiceLifetime.Singleton); //Scoped is the default, but we can be explicit - and allow for singletonScope
+                                                        //When needed
+
+//We know we will need more than one LibraryDbContext in one or more of these methods. But we dont know how many
+//before runtome So we can use a DBContextFactory to create as many as we need at runtime. 
+builder.Services.AddDbContextFactory<LibraryDbContext>(Options => Options.UseSqlServer(conn_string));
+
+//Register our custom service with builder
+builder.Services.AddScoped<IFulfillmentService, FulFillmentService>();
 
 //Swagger stuff added to builder
 builder.Services.AddEndpointsApiExplorer();
@@ -149,6 +173,73 @@ app.MapGet("/peek/conflict", (IServiceScopeFactory scopes) =>
 
 });
 
+//Endpoint to reset the stock of the items in my catalog - useful for testing and demo
+//might need to hit this endpoint while we work
+app.MapGet("/inventory/rest", (LibraryDbContext db, ILogger<Program> logger) =>
+{
+    //We just ask for an ILogger like we do our dbcontext
+    //thenuse it as normal
+    logger.LogInformation("Start seeing database");
+
+    //What I want to i is reset the items that I know I stuck into the db
+    foreach(InventoryItem inv in db.Inventory)
+    {
+        
+        //I onlu want to do something if the primary key is 1,2 or 3...
+        switch(inv.Id)
+        {
+            case 1:
+                inv.CurrentStock = 5;
+                break;
+
+            case 2:
+                inv.CurrentStock = 3;
+                break;
+
+            case 3:
+                inv.CurrentStock = 8;
+                break;
+            default:
+                break;
+        }
+    }
+
+    db.SaveChanges(); //Persisting to db
+    logger.LogInformation("Stock restock");
+    return Results.Ok("Stock reset");
+});
+//Fulfillment stuff for orders goes down here
+//Im going to take in info from the front end (swager for now)
+//I have a few options
+//I can take in from the uri/query string
+//I can also take in parameters from the body
+
+//Quick method to fulfill one order
+app.MapPost("/orders", async (OrderPayLoad orderRequest, IDbContextFactory<LibraryDbContext> factory,
+    CancellationToken ct, IFulfillmentService fsvc) =>
+{
+    //Remember we create our order in our db
+    //And then try to crete a successful fulfillment record against the db
+    await using var db = await factory.CreateDbContextAsync(ct);//ask the db context to place order
+
+    var newOrder = new Order
+    {
+        CustomerId = orderRequest.CustomerId,
+        Priority = Priority.Normal,
+        Lines = {new OrderLines { ProductId = orderRequest.ProductId, Quantity = orderRequest.Quantity}}
+    };
+
+    db.Orders.Add(newOrder); //add new order
+    await db.SaveChangesAsync(ct); //save the order to db
+
+    //Now that we have added the order - we tru to fulfill it
+    var result = await fsvc.FulfillOneAsync(newOrder.Id, ct); //newOrder is now on the db, 
+    return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
+});
 
 //My file always ends with app.Run() - minimal API or Controller API
 app.Run();
+Log.CloseAndFlush();
+
+public record OrderPayLoad(int ProductId, int Quantity, int CustomerId);
+
