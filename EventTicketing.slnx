@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Fulfillment.Api/Fulfillment.Api.csproj" />
+  <Project Path="Fulfillment.Data/Fulfillment.Data.csproj" />
+</Solution>
