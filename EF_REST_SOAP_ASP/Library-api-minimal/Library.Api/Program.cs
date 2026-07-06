@@ -5,6 +5,7 @@ using Library.Data.Entities;
 using Serilog;
 using Library.Api.Fulfillment;
 using Library.Data.Enums;
+using System.Diagnostics;
 
 //This is my API Program.cs
 //No main, we can think of it as 2 sections
@@ -15,7 +16,7 @@ using Library.Data.Enums;
 //Builder area
 var builder = WebApplication.CreateBuilder(args);
 
-//The first thing that we need is to five our builder a connection string to our database
+//The first thing that we need is to give our builder a connection string to our database
 var conn_string ="Server=localhost,1433;Database=LibraryMinimalDb;User Id=sa; Password=LibraryPassword1; TrustServerCertificate=true";
 
 Log.Logger = new LoggerConfiguration()
@@ -33,7 +34,7 @@ builder.Host.UseSerilog(); //Tell the builder to use Serilog for logging
 //ASP.NET has fwa different scocpe types
 //transient - a new insance is created every time it's required
 //Scoped - new instance for HTTP request
-//Sungleton - A single instance for the entire runtime of the app
+//Singleton - A single instance for the entire runtime of the app
 builder.Services.AddDbContext<LibraryDbContext>(options => options.UseSqlServer(conn_string),
     ServiceLifetime.Scoped, ServiceLifetime.Singleton); //Scoped is the default, but we can be explicit - and allow for singletonScope
                                                         //When needed
@@ -44,6 +45,8 @@ builder.Services.AddDbContextFactory<LibraryDbContext>(Options => Options.UseSql
 
 //Register our custom service with builder
 builder.Services.AddScoped<IFulfillmentService, FulFillmentService>();
+builder.Services.AddScoped<ISeeder, Seeder>();
+builder.Services.AddScoped<BurstPlanner>(); //Adding our BurstPlanner, will bee used in FullfillmentService
 
 //Swagger stuff added to builder
 builder.Services.AddEndpointsApiExplorer();
@@ -178,7 +181,7 @@ app.MapGet("/peek/conflict", (IServiceScopeFactory scopes) =>
 app.MapGet("/inventory/rest", (LibraryDbContext db, ILogger<Program> logger) =>
 {
     //We just ask for an ILogger like we do our dbcontext
-    //thenuse it as normal
+    //then use it as normal
     logger.LogInformation("Start seeing database");
 
     //What I want to i is reset the items that I know I stuck into the db
@@ -235,6 +238,106 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest, IDbContextFactory<Libra
     //Now that we have added the order - we tru to fulfill it
     var result = await fsvc.FulfillOneAsync(newOrder.Id, ct); //newOrder is now on the db, 
     return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
+});
+
+//Burst EndPoint ------------------------->
+//Forgoing creating a record - we will take these from a the query string
+//IHostApplicationLifetime - this lefts us see events related to the app lifetimes
+//We are going to use it to make suere we "slush" pening otders if the app is asked to stop
+app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder,
+            IServiceScopeFactory scopes, IHostApplicationLifetime lifetime ) =>
+{
+   var ids = seeder.SeedOrders(n, expedited); //Callling the seed orders methods with the  stuff from front end
+    var appStopping = lifetime.ApplicationStopping; //Gives us a cancellation token that is called when app goes to shutdown
+
+    _ = Task.Run(async () => //assigning the task result to a discard runs this is a background task
+    {
+        try
+        {
+            using var scope = scopes.CreateScope(); //ask for a fresh scope 
+            var service = scope.ServiceProvider.GetRequiredService<IFulfillmentService>();//grab a fullfillment service
+            await service.FulfillBurstAsync(ids, appStopping);  //use it to call fulfillBurstAsync()
+        }
+        catch (Exception ex)
+        {
+            //This task is fire and forget becouse we arent waiting or staring its result
+            //any exception would be "swallowed" i.e. they would die with thte tast in the background    
+            Log.Error(ex, "Burst fulfillment failed");
+        }
+    }, appStopping);
+});
+
+app.MapGet("/verify/no-oversell", (LibraryDbContext db)=>
+{
+    var rows = db.Inventory.Include(i => i.Product).ToList();//Grab inventory rows, including
+    var negative = rows.Where( i=> i.CurrentStock < 0);
+    var fulfilled = db.FulFillmentEvents.Count(e=>e.Type == "Fulfilled");
+
+    return new { 
+        anyNegative = negative.Any(), 
+        onHand = rows.Select(i=> new {i.ProductId,i.CurrentStock}),
+        unitsFulfilled = fulfilled
+    };
+
+});
+
+app.MapPost("/benchmark", async(int n, IFulfillmentService fs, ISeeder seeder, CancellationToken ct) =>
+{
+    //Lets see how sequential vs parallel runs compare - with mixed orders
+    var ids1 = seeder.ResetAndCreateOrders(n);
+
+    //First
+    var sw1 = Stopwatch.StartNew(); //Start our stopwatch
+
+    foreach(var id in ids1)
+    {
+        await fs.FulfillOneAsync(id,ct);
+    }
+
+    sw1.Stop();
+
+    //Next 
+    var ids2 = seeder.ResetAndCreateOrders(n);
+
+    var sw2 = Stopwatch.StartNew(); //Second stop watch
+    await fs.FulfillBurstAsync(ids2, ct);
+    sw2.Stop();
+
+    return new 
+    {
+        sequantialMs = sw1.ElapsedMilliseconds,
+        concurrentMs = sw2.ElapsedMilliseconds
+    };
+
+});
+
+//Competion report -- what orders fot completed and when
+//Note : In general Expedited orders should be completed first. In practice - it depends on how long each thread takes
+//if for some reason an expedited order's thread slows down (due to some background process on the computer or something)
+//then a normal order CAN beat it. But we should see a defined trend
+
+app.MapGet("/reports/by-completion", (LibraryDbContext db) =>
+{
+    return db.Orders //Look inside orders table
+        .Where(o => o.Status == Status.Fullfilled) //Grab fulfilled orders
+        .OrderBy(o => o.CompletedUtc) //order by when they were completed based on timestamp
+        .Select(o => new {o.Id, o.Priority, o.CompletedUtc}) //use info from those orders to make some return object
+        .ToList(); //pur them in a list and return them as body of response
+    
+});
+
+
+app.MapGet("/reports/top-products", (LibraryDbContext db) =>
+{
+    var ranked = db.FulFillmentEvents
+        .Where(e => e.Type == "FUlfilled")
+        .Join(db.OrderLines, e => e.OrderId, l => l.OrderId, (e,l) =>l)
+        .GroupBy(l => l.ProductId)
+        .Select(g => new {ProductId = g.Key, Units = g.Sum(l => l.Quantity)})
+        .OrderByDescending(x => x.Units)
+        .ToList(); //LINQ is basically magic - pls learn to use it
+    
+    return ranked;
 });
 
 //My file always ends with app.Run() - minimal API or Controller API

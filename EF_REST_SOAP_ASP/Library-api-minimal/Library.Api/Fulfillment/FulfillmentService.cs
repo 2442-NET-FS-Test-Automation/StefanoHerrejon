@@ -9,11 +9,13 @@ using Serilog;
 namespace Library.Api.Fulfillment;
 
 //ASP.NET's builder (DI container) NEEDS us to provide 2 things when we register a service
-//An interface and a concrete implemetnation. These can both go in the same file
+//An interface and a concrete implementation. These can both go in the same file
 
 public interface IFulfillmentService
 {
     public Task<FulFillmentResult> FulfillOneAsync(int orderId, CancellationToken ct);
+
+    public Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct);
 }
 
 //I am going to stick everything about order fulfillment in this file
@@ -31,15 +33,18 @@ public class FulFillmentService : IFulfillmentService
     //we DO NOT instantiate one here, we ask for one via the Constructor
     private readonly IDbContextFactory<LibraryDbContext> _factory;
 
+    private readonly BurstPlanner _planner; //Holds my burstPlanner object
+
     //The factory in the constructor argyments list comes from the ASP.NET DI COntainer
-    public FulFillmentService(IDbContextFactory<LibraryDbContext> factory)
+    public FulFillmentService(IDbContextFactory<LibraryDbContext> factory, BurstPlanner planner)
     {
         _factory = factory;
+        _planner = planner;
     }
 
-    //This method is going to handle fulfillment - its fonna be a bit long which is why we didnt 
-    //just write all of if
-    public async Task<FulFillmentResult> FulFillOneAsync(int orderId, CancellationToken ct)
+    //This method is going to handle fulfillment - its gonna be a bit long which is why we didnt 
+    //just write all of it on program.cs
+    public async Task<FulFillmentResult> FulfillOneAsync(int orderId, CancellationToken ct)
     {
         //First - we need a db contect
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -48,12 +53,12 @@ public class FulFillmentService : IFulfillmentService
         //flow for this - a costumer places an order. It hits the order table - we are now fulfilling that order
         var order = await db.Orders.Include(a => a.Lines).FirstAsync(a => a.Id == orderId, ct); //LINQ with async
 
-        //lest create that dictionary with the productId and the OrderId value
+        //lets create that dictionary with the productId and the Quantity value
         //Yay for LINQ/COllections namespace
-        var requested = order.Lines.ToDictionary(l => l.ProductId, l => l.OrderId);
+        var requested = order.Lines.ToDictionary(l => l.ProductId, l => l.Quantity);
 
 
-        //Creatint a flag for "can I continue fulfilling this order"
+        //Creating a flag for "can I continue fulfilling this order"
         bool canFulfill = true;
 
         foreach(OrderLines line in order.Lines)
@@ -109,13 +114,13 @@ public class FulFillmentService : IFulfillmentService
     }
 
     //Lets breack the logic for saving with retry (via RowVersion) into its onw method
-    //jus tto help keep things straight. IReadOlyDictionary just makes any dict we pass in readonly
+    //just to help keep things straight. IReadOnlyDictionary just makes any dict we pass in readonly
     private static async Task<bool> SaveWithRetryAsync(
-        LibraryDbContext db, IReadOnlyDictionary<int,int> requesterdByProductId, CancellationToken ct)
+        LibraryDbContext db, IReadOnlyDictionary<int,int> RequestedByProductId, CancellationToken ct)
     {
         //This is that RowVersion Change Tracker entry retry from yesterday
         //Lest set max retries to 3 - by wrapping everythin in a loop
-        for(int attempt = 0; ; attempt++)
+        while(true)
         {
             //Our loop as written never exits - it does increment attempt for us
             //if we retry and fail x amount of times - we will throw an exception manually
@@ -126,7 +131,7 @@ public class FulFillmentService : IFulfillmentService
                 await db.SaveChangesAsync(ct);
                 return true;   
             }//We can tell our try catch how many timpes to handle this exception for us
-            catch(DbUpdateConcurrencyException ex) when (attempt < 3)
+            catch(DbUpdateConcurrencyException ex) 
             {
                 //Retry loggic - remember that change tracker stuff?
                 //entry is an EF Core Change tracker entry
@@ -146,10 +151,10 @@ public class FulFillmentService : IFulfillmentService
                         //Grab the current total for that item's stock
                         int freshValue = current.GetValue<int>(nameof(InventoryItem.CurrentStock));
                         //Dictionary lookup against the dict we passed in
-                        int desiredAmount = requesterdByProductId[inv.ProductId];
+                        int desiredAmount = RequestedByProductId[inv.ProductId];
 
                         //Re-check on the fresh stock - don't blindly trust it
-                        if(freshValue < desiredAmount) return false;
+                        if(freshValue < desiredAmount) return false; //This is noe our exit condition
                         inv.CurrentStock = freshValue - desiredAmount;
                     }
                 }
@@ -157,8 +162,35 @@ public class FulFillmentService : IFulfillmentService
         }
     }
 
-    public Task<FulFillmentResult> FulfillOneAsync(int orderId, CancellationToken ct)
+    //Function to call fulfilloneasync for burstresult
+    public async Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct )
     {
-        throw new NotImplementedException();
+        //Grabbing all my orderIds
+        List<int> idList = orderIds.ToList();
+
+        List<Order> orders; //Place to store my orders
+
+        //Calling on a db context that we discard after we are done
+        await using (var db = await _factory.CreateDbContextAsync(ct))
+        {
+            //Look at our db, grab every order that appears in our idList
+            orders = await db.Orders.Where(o => idList.Contains(o.Id)).ToListAsync();
+        }
+
+        //Calling on our planning logic inside BurstPlanner
+        //planned contain our expedited/priority first order
+        var planner = _planner.OrderByPriority(orders);
+
+        //We are gling to piggybacl off of FulfillOnAsync  no need to rewrite logic we can just call it again
+        var tasks = orderIds.Select(id => FulfillOneAsync(id, ct)); //Each call will get its own dbContext
+
+        //Await here until all tasks in the collection are complete
+        var results = await Task.WhenAll(tasks);
+
+        return new BurstResult(
+            Fulfilled: results.Count(r=>r == FulFillmentResult.Fulfilled),
+            BackOrdered: results.Count(r=>r == FulFillmentResult.Backordered)
+        );
     }
+
 }
