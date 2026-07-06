@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Fulfillment.Data.Entities;
+using Fulfillment.Data.Enums;
 
 namespace Fulfillment.Data;
 
@@ -32,7 +33,7 @@ public class FulfillmentDBContext : DbContext
     {
         mb.Entity<Ticket>(e =>
         {
-            e.HasIndex(p=>p.Sku).IsUnique();//SKU is unique
+            e.HasIndex(p=>p.Sku).IsUnique();//SKU is unique e Indice de busqueda
             e.Property(p=>p.Price).HasColumnType("decimal(10,2)");//Price is decimal
             e.HasOne(p=>p.Inventory)
                 .WithOne(i=>i.Ticket)

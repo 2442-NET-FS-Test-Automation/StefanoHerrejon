@@ -1,22 +1,141 @@
 using Microsoft.EntityFrameworkCore;
 using Fulfillment.Data;
+using Microsoft.Extensions.DependencyModel;
+using Microsoft.Extensions.Options;
+using Serilog;
+using Fulfillment.Data.Entities;
+using Fulfillment.Api.Fulfillment;
+using Fulfillment.Data.Enums;
 //API
 //Register things with the builder
 
-//Configurings thigns on the app
+//Configurings things on the app
 
-//API Calls and RUN method
+//API Calls and RUN method - builder area
 var builder = WebApplication.CreateBuilder(args);
 
 //1) Give our builder a connection string to our database
 var conn_string ="Server=localhost,1433;Database=SHFullFillment;User Id=sa; Password=LibraryPassword1; TrustServerCertificate=true";
 
+//Serilog Area
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console() //Write to console
+    .WriteTo.File("log/fulfillment-log.txt", rollingInterval:RollingInterval.Day)//Write to file, new log file every day
+    .CreateLogger();
+builder.Host.UseSerilog();//Builder is told we are using serilog for logging
+
 //Builder => use FulfillmentDBContext and string above to connecto to the db
 //Managing of creating, destroying is handed off 
-builder.Services.AddDbContext<FulfillmentDBContext>(options => options.UseSqlServer(conn_string));
+//We use Design Pattern Singleton
+builder.Services.AddDbContext<FulfillmentDBContext>(options => options.UseSqlServer(conn_string),
+    ServiceLifetime.Scoped, ServiceLifetime.Singleton);
 
+//We can use more than one LibraryDBContext for methods, we create as many as we needed at runtime
+builder.Services.AddDbContextFactory<FulfillmentDBContext>(Options => Options.UseSqlServer(conn_string));
+
+//Register the customer service with builder -> DO LATER
+//builder.Services.AddScoped<IFull
+
+//Swagger stuff
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+//App Area ---------------------------------------------------------
 var app = builder.Build();
 
-app.MapGet("/", () => "Hello World!");
+//Swagger Stuff added to the app
+app.UseSwagger();
+app.UseSwaggerUI();
 
-app.Run();
+//Hello world
+app.MapGet("/", (ILogger<Program> logger) => 
+{    
+    logger.LogInformation("-------------------RUN START-------------------"); 
+    return "Hello World!";
+});
+
+//Get all items
+app.MapGet("/inventory", async (FulfillmentDBContext db, ILogger<Program> logger) =>
+{
+    logger.LogInformation("Endpoint Inventory");
+    return await db.Inventory.ToListAsync();
+});
+
+//Reset inventory endpoint
+app.MapGet("/inventory/reset", (FulfillmentDBContext db, ILogger<Program> logger) =>
+{
+    //Serilog
+    logger.LogInformation("Start of reseting DB");
+
+    //Reset default items/Seeding
+    foreach(TicketItem inv in db.Inventory)
+    {
+        switch(inv.Id)
+        {
+            case 1:
+                inv.QuantityOnHand = 15;
+                break;
+            case 2:
+                inv.QuantityOnHand = 5;
+                break;
+            case 3:
+                inv.QuantityOnHand = 3;
+                break;
+            default:
+                break;
+        }
+    }
+
+    db.SaveChanges(); //Save to DB
+    logger.LogInformation("Stock restock to default");
+    return Results.Ok("Stock reset");
+});
+
+//GET Inventory/ticket by CustomerId
+app.MapGet("/inventory/{id}",async (int id, FulfillmentDBContext db, ILogger<Program> logger) =>
+{
+    logger.LogInformation("Orders with {CustomerId} customerId",id);
+    //Search via LINQ
+    var tickets = db.Orders.GroupBy(o=>o.CustomerId).Select(g => new {Customer = g.Key, Orders = g.Count()});
+
+    return tickets is null ? Results.NotFound() : Results.Ok(tickets); //Return
+});
+
+
+//Get inventory by value
+app.MapGet("inventory/by-value", (FulfillmentDBContext db) =>
+{
+    return db.Inventory.Include(i => i.TicketId)
+        .GroupBy(i => i.QuantityOnHand >=5 ? "Well Stocked":"low")
+        .Select(g => new{tier = g.Key, count = g.Count(), units = g.Sum(i => i.QuantityOnHand)})
+        .ToList();
+});
+
+
+//Quick Method to fulfill an order
+app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<FulfillmentDBContext> factory, 
+        CancellationToken ct, IFulfilmentService fsvc) =>
+{
+    await using var db = await factory.CreateDbContextAsync(ct); 
+
+    var newOrder = new Order
+    {
+        CustomerId = orderRequest.CustomerId,
+        Priority = Priority.Normal,
+        Lines = {new OrderLines{ProductId = orderRequest.ProductId, Quantity = orderRequest.Quantity}}
+    };
+
+    db.Orders.Add(newOrder); //Add new Order
+    await db.SaveChangesAsync(ct); //Save the order to the db
+
+    //Now we try to fulfill the order
+    var result = await fsvc.FulfillmentAsync(newOrder.Id, ct);
+    return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
+});
+
+
+
+app.Run(); //API RUN
+Log.CloseAndFlush(); //Close Loggs
+public record OrderPayLoad(int ProductId, int Quantity, int CustomerId);
+
