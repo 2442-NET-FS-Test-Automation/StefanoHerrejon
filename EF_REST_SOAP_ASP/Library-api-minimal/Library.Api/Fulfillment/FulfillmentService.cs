@@ -35,10 +35,10 @@ public class FulFillmentService : IFulfillmentService
 
     private readonly BurstPlanner _planner; //Holds my burstPlanner object
 
-    //The factory in the constructor argyments list comes from the ASP.NET DI COntainer
+    //The factory in the constructor arguments list comes from the ASP.NET DI COntainer
     public FulFillmentService(IDbContextFactory<LibraryDbContext> factory, BurstPlanner planner)
     {
-        _factory = factory;
+        _factory = factory; 
         _planner = planner;
     }
 
@@ -181,7 +181,7 @@ public class FulFillmentService : IFulfillmentService
         //planned contain our expedited/priority first order
         var planner = _planner.OrderByPriority(orders);
 
-        //We are gling to piggybacl off of FulfillOnAsync  no need to rewrite logic we can just call it again
+        //We are going to piggybacl off of FulfillOnAsync  no need to rewrite logic we can just call it again
         var tasks = orderIds.Select(id => FulfillOneAsync(id, ct)); //Each call will get its own dbContext
 
         //Await here until all tasks in the collection are complete

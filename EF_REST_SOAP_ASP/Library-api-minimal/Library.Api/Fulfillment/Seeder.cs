@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Library.Api.Fulfillment;
 
-//In "production" our orders would come fromusers, these APIs run locally
+//In "production" our orders would come from users, these APIs run locally
 //So we could either - create a post for a single order and run a shell script or something
 //or we create a seeding endpoint from here to generate some orders for us
 
