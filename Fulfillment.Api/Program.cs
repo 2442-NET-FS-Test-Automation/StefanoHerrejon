@@ -6,6 +6,7 @@ using Serilog;
 using Fulfillment.Data.Entities;
 using Fulfillment.Api.Fulfillment;
 using Fulfillment.Data.Enums;
+using Microsoft.IdentityModel.Tokens;
 //API
 //Register things with the builder
 
@@ -33,8 +34,10 @@ builder.Services.AddDbContext<FulfillmentDBContext>(options => options.UseSqlSer
 //We can use more than one LibraryDBContext for methods, we create as many as we needed at runtime
 builder.Services.AddDbContextFactory<FulfillmentDBContext>(Options => Options.UseSqlServer(conn_string));
 
-//Register the customer service with builder -> DO LATER
-//builder.Services.AddScoped<IFull
+//Register the customer service with builder 
+builder.Services.AddScoped<IFulfilmentService, FulfillmentService>(); //Fulfillment service
+builder.Services.AddScoped<ISeeder, Seeder>();
+builder.Services.AddScoped<BurstPlanner>();
 
 //Swagger stuff
 builder.Services.AddEndpointsApiExplorer();
@@ -48,11 +51,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 //Hello world
-app.MapGet("/", (ILogger<Program> logger) => 
-{    
-    logger.LogInformation("-------------------RUN START-------------------"); 
-    return "Hello World!";
-});
+app.MapGet("/", () => "Hello World!");
 
 //Get all items
 app.MapGet("/inventory", async (FulfillmentDBContext db, ILogger<Program> logger) =>
@@ -105,7 +104,7 @@ app.MapGet("/inventory/{id}",async (int id, FulfillmentDBContext db, ILogger<Pro
 //Get inventory by value
 app.MapGet("inventory/by-value", (FulfillmentDBContext db) =>
 {
-    return db.Inventory.Include(i => i.TicketId)
+    return db.Inventory.Include(i => i.Ticket)
         .GroupBy(i => i.QuantityOnHand >=5 ? "Well Stocked":"low")
         .Select(g => new{tier = g.Key, count = g.Count(), units = g.Sum(i => i.QuantityOnHand)})
         .ToList();
@@ -129,11 +128,31 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<Fulfil
     await db.SaveChangesAsync(ct); //Save the order to the db
 
     //Now we try to fulfill the order
-    var result = await fsvc.FulfillmentAsync(newOrder.Id, ct);
+    var result = await fsvc.FulfillOneAsync(newOrder.Id, ct);
     return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
 });
 
 
+//Burst EndPoint
+app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder, IServiceScopeFactory scopes, IHostApplicationLifetime lifetime) =>
+{
+    var ids = seeder.SeeOrders(n, expedited); //Create orders via seeder
+    var appStopping = lifetime.ApplicationStopping; //Cancelation token
+
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            using var scope = scopes.CreateScope(); //Fresh scope
+            var service = scope.ServiceProvider.GetRequiredService<IFulfilmentService>(); //Grab a fulfillment service
+            await service.FulfillBurstAsync(ids, appStopping);
+        }catch(Exception ex)
+        {
+            //The task failed
+            Log.Error(ex, "Burst Fulfillment failed");
+        }
+    }, appStopping);
+});
 
 app.Run(); //API RUN
 Log.CloseAndFlush(); //Close Loggs

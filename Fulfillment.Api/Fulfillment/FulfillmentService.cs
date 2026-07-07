@@ -9,28 +9,36 @@ namespace Fulfillment.Api.Fulfillment;
 
 public interface IFulfilmentService //Interface for fulfillment service
 {
-    public Task<FulfillmentResult> FulfillmentAsync(int orderId, CancellationToken ct);
+    public Task<FulfillmentResult> FulfillOneAsync(int orderId, CancellationToken ct);
+
+    public Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct);
 
 }
 
 //Request can have only 2 results. Fulfilled => order is fulfilled, Backordered => order is not filfilled
 public enum FulfillmentResult{Fulfilled, Backordered}
 
+//How many were fulfilled, how many were backordered
+public record BurstResult(int Fulfilled, int BackOrdered);
+
 //Class for fulfillment service aka post orders, and fulfillment
 public class FulfillmentService : IFulfilmentService
 {
     private readonly IDbContextFactory<FulfillmentDBContext> _factory;
 
-    public FulfillmentService(IDbContextFactory<FulfillmentDBContext> factory)
+    private readonly BurstPlanner _planner;
+
+    public FulfillmentService(IDbContextFactory<FulfillmentDBContext> factory, BurstPlanner planner)
     {
         _factory = factory;
+        _planner = planner;
     }
 
     //Method in charge of fulfillment
     //We gran the order from the dbContext via the parameter orderId
     //We create a dictionary to fill from OrderLines the productId = Quantity
 
-    public async Task<FulfillmentResult> FulfillmentAsync(int orderId, CancellationToken ct)
+    public async Task<FulfillmentResult> FulfillOneAsync(int orderId, CancellationToken ct)
     {
         await using var db = await _factory.CreateDbContextAsync(ct); //Db context through Constructor/properties
 
@@ -129,5 +137,32 @@ public class FulfillmentService : IFulfilmentService
                 }
             }
         }
+    }
+
+    public async Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct)
+    {
+        List<int> idList = orderIds.ToList();//Grabing all ordersIds
+
+        List<Order> orders; //List to store my orders
+
+        await using (var db = await _factory.CreateDbContextAsync(ct))
+        {//Filling orders list with Orders which have order.id on the idList(list of new orders)
+            orders = await db.Orders.Where(o => idList.Contains(o.Id)).ToListAsync();
+        }
+
+        //Using BurstPlanner to order order based on priority
+        var planner = _planner.OrderByPriority(orders);
+
+        //Using prev logic to complete a single order
+        var tasks = orderIds.Select(id => FulfillOneAsync(id, ct));
+
+        //Await here until all orders are completed
+        var results = await Task.WhenAll(tasks);
+
+        return new BurstResult(
+            Fulfilled : results.Count(r => r == FulfillmentResult.Fulfilled),
+            BackOrdered : results.Count(r => r == FulfillmentResult.Backordered)
+        );
+
     }
 }
