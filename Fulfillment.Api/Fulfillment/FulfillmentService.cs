@@ -131,7 +131,7 @@ public class FulfillmentService : IFulfilmentService
                         int desireAmount = RequestedByProduct[inv.TicketId]; //Desire amount for sell
 
                         if(freshValue < desireAmount) return false; //Updated quantity is not enough for how much they want to buy
-                        inv.QuantityOnHand -= desireAmount; //We can sell
+                        inv.QuantityOnHand =freshValue- desireAmount; //We can sell
                     }
 
                 }
