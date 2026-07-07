@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Library.Data;
-using Microsoft.Extensions.Options;
 using Library.Data.Entities;
 using Serilog;
 using Library.Api.Fulfillment;
@@ -47,6 +46,7 @@ builder.Services.AddDbContextFactory<LibraryDbContext>(Options => Options.UseSql
 builder.Services.AddScoped<IFulfillmentService, FulFillmentService>();
 builder.Services.AddScoped<ISeeder, Seeder>();
 builder.Services.AddScoped<BurstPlanner>(); //Adding our BurstPlanner, will bee used in FullfillmentService
+builder.Services.AddScoped<OrderFactory>();
 
 //Swagger stuff added to builder
 builder.Services.AddEndpointsApiExplorer();
@@ -110,6 +110,16 @@ app.MapGet("/peek/tracking", (LibraryDbContext db) =>
 
     return states;
 });
+
+//Peek loading strategies
+app.MapGet("/peek/loading", (LibraryDbContext db) =>
+{
+    Product product = db.Products.First(); //Grab the first product from DB table
+    //Expllicit loading via Load()
+    db.Entry(product).Reference(p=>p.Inventory).Load();//Making another trip to the db to  populate the property
+
+});
+
 
 //Lets manually go out of our way to create a conflict - obviously dont do this on a real app
 app.MapGet("/peek/conflict", (IServiceScopeFactory scopes) =>
@@ -235,7 +245,7 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest, IDbContextFactory<Libra
     db.Orders.Add(newOrder); //add new order
     await db.SaveChangesAsync(ct); //save the order to db
 
-    //Now that we have added the order - we tru to fulfill it
+    //Now that we have added the order - we try to fulfill it
     var result = await fsvc.FulfillOneAsync(newOrder.Id, ct); //newOrder is now on the db, 
     return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
 });
@@ -243,7 +253,7 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest, IDbContextFactory<Libra
 //Burst EndPoint ------------------------->
 //Forgoing creating a record - we will take these from a the query string
 //IHostApplicationLifetime - this lefts us see events related to the app lifetimes
-//We are going to use it to make suere we "slush" pening otders if the app is asked to stop
+//We are going to use it to make suere we "slush" pening orders if the app is asked to stop
 app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder,
             IServiceScopeFactory scopes, IHostApplicationLifetime lifetime ) =>
 {
@@ -340,9 +350,57 @@ app.MapGet("/reports/top-products", (LibraryDbContext db) =>
     return ranked;
 });
 
+
+//Binary Search on Sorted result
+app.MapGet("/reports/rank-of/{units}:int",(int units, LibraryDbContext db)=>
+{
+    //Using LINQ & BinarySearch to grab units sold per product, ordered descending
+    var unitsDesc = db.FulFillmentEvents
+                        .Where(e => e.Type == "Fulfilled")
+                        .Join(db.OrderLines, e=> e.OrderId, l => l.OrderId, (e,l) => l)
+                        .GroupBy(l => l.ProductId)
+                        .Select(g => g.Sum(l => l.Quantity))
+                        .OrderByDescending(u=>u)
+                        .ToArray();
+    
+    //Sorted DESC => Using Binary Search to find the index of a specific quantity sold
+    //100,400,330,34
+    //Our BS needs a comparer - for something like an int or a char this is easy
+    //if you want to do this with custom classes - you need to override CompareTo kike we do ToString
+    var index = Array.BinarySearch(unitsDesc, units, Comparer<int>.Create((a,b) => b.CompareTo(a)));
+
+    return new {units, rank = index >= 0 ? index +1:-1}; //If BS doesnt find a thing - it returns wome bitwise
+    //Complement or something - we collapse it to -1
+
+});
+
+app.MapPost("/orders-with-factory", async(OrderRequest req, OrderFactory factory, 
+        IDbContextFactory<LibraryDbContext> dbf, CancellationToken ct) =>
+{
+    try
+    {
+        Order newOrder= factory.CreateOrder(req.Kind, req.CustomerId, req.Lines.Select(l=>(l.Sku, l.Qty)));
+
+        await using var db = await dbf.CreateDbContextAsync(ct);
+
+        db.Orders.Add(newOrder);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Created($"/orders/{newOrder.Id}", new{newOrder.Id});
+    }
+    catch(UnKnownSkuException ex)
+    {
+        Log.Warning("Rejected order: unknown SKU {sku}", ex.Sku);
+        return Results.BadRequest(new {error = ex.Message, sku = ex.Sku});
+    }
+});
+
 //My file always ends with app.Run() - minimal API or Controller API
 app.Run();
 Log.CloseAndFlush();
 
+//Records
 public record OrderPayLoad(int ProductId, int Quantity, int CustomerId);
+public record OrderLineRequest(string Sku, int Qty);
+public record OrderRequest(string Kind, int CustomerId, List<OrderLineRequest> Lines);
 

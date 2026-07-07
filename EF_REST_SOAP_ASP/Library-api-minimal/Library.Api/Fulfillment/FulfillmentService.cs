@@ -5,6 +5,7 @@ using Library.Data.Entities;
 using Library.Data.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Collections.Concurrent;
 
 namespace Library.Api.Fulfillment;
 
@@ -16,6 +17,8 @@ public interface IFulfillmentService
     public Task<FulFillmentResult> FulfillOneAsync(int orderId, CancellationToken ct);
 
     public Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct);
+
+    public int ResolverProductId(string sku);
 }
 
 //I am going to stick everything about order fulfillment in this file
@@ -35,11 +38,34 @@ public class FulFillmentService : IFulfillmentService
 
     private readonly BurstPlanner _planner; //Holds my burstPlanner object
 
+    private readonly ConcurrentDictionary<string, int> _skuToProductId;
+
     //The factory in the constructor arguments list comes from the ASP.NET DI COntainer
     public FulFillmentService(IDbContextFactory<LibraryDbContext> factory, BurstPlanner planner)
     {
         _factory = factory; 
         _planner = planner;
+
+        //Storing Skus and their productId so we can do O(1) lookup if we need it later
+        using var db = _factory.CreateDbContext();
+        _skuToProductId = new ConcurrentDictionary<string, int>(
+            db.Products.ToDictionary(p=> p.Sku, p=>p.Id)
+        );
+
+    }
+
+    //Method to resolver Skus to productId using that dictionary
+    public int ResolverProductId(string sku)
+    {
+        try
+        {
+            return _skuToProductId[sku];
+        }
+        catch(KeyNotFoundException)
+        {
+            throw new UnKnownSkuException(sku);
+        }
+        
     }
 
     //This method is going to handle fulfillment - its gonna be a bit long which is why we didnt 
@@ -133,6 +159,7 @@ public class FulFillmentService : IFulfillmentService
             }//We can tell our try catch how many timpes to handle this exception for us
             catch(DbUpdateConcurrencyException ex) 
             {
+                Log.Logger.Warning("Error trying to save db on SaveWithRetryAsync");
                 //Retry loggic - remember that change tracker stuff?
                 //entry is an EF Core Change tracker entry
                 foreach(var entry in ex.Entries)
