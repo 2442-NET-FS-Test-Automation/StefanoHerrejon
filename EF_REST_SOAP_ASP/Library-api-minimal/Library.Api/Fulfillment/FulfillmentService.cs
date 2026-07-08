@@ -209,7 +209,7 @@ public class FulFillmentService : IFulfillmentService
         var planner = _planner.OrderByPriority(orders);
 
         //We are going to piggybacl off of FulfillOnAsync  no need to rewrite logic we can just call it again
-        var tasks = orderIds.Select(id => FulfillOneAsync(id, ct)); //Each call will get its own dbContext
+        var tasks = planner.Select(id => FulfillOneAsync(id, ct)); //Each call will get its own dbContext
 
         //Await here until all tasks in the collection are complete
         var results = await Task.WhenAll(tasks);

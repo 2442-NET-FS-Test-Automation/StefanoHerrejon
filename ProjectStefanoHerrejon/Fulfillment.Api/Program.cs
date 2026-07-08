@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Fulfillment.Data;
-using Microsoft.Extensions.DependencyModel;
-using Microsoft.Extensions.Options;
 using Serilog;
 using Fulfillment.Data.Entities;
 using Fulfillment.Api.Fulfillment;
 using Fulfillment.Data.Enums;
-using Microsoft.IdentityModel.Tokens;
+using System.Diagnostics;
+using Microsoft.AspNetCore.Http.HttpResults;
 //API
 //Register things with the builder
 
@@ -35,7 +34,7 @@ builder.Services.AddDbContext<FulfillmentDBContext>(options => options.UseSqlSer
 builder.Services.AddDbContextFactory<FulfillmentDBContext>(Options => Options.UseSqlServer(conn_string));
 
 //Register the customer service with builder 
-builder.Services.AddScoped<IFulfilmentService, FulfillmentService>(); //Fulfillment service
+builder.Services.AddScoped<IFulfillmentService, FulfillmentService>(); //Fulfillment service
 builder.Services.AddScoped<ISeeder, Seeder>();
 builder.Services.AddScoped<BurstPlanner>();
 
@@ -90,30 +89,10 @@ app.MapGet("/inventory/reset", (FulfillmentDBContext db, ILogger<Program> logger
     return Results.Ok("Stock reset");
 });
 
-//GET Inventory/ticket by CustomerId
-app.MapGet("/inventory/{id}",async (int id, FulfillmentDBContext db, ILogger<Program> logger) =>
-{
-    logger.LogInformation("Orders with {CustomerId} customerId",id);
-    //Search via LINQ
-    var tickets = db.Orders.GroupBy(o=>o.CustomerId).Select(g => new {Customer = g.Key, Orders = g.Count()});
-
-    return tickets is null ? Results.NotFound() : Results.Ok(tickets); //Return
-});
-
-
-//Get inventory by value
-app.MapGet("inventory/by-value", (FulfillmentDBContext db) =>
-{
-    return db.Inventory.Include(i => i.Ticket)
-        .GroupBy(i => i.QuantityOnHand >=5 ? "Well Stocked":"low")
-        .Select(g => new{tier = g.Key, count = g.Count(), units = g.Sum(i => i.QuantityOnHand)})
-        .ToList();
-});
-
 
 //Quick Method to fulfill an order
 app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<FulfillmentDBContext> factory, 
-        CancellationToken ct, IFulfilmentService fsvc) =>
+        CancellationToken ct, IFulfillmentService fsvc) =>
 {
     await using var db = await factory.CreateDbContextAsync(ct); 
 
@@ -144,7 +123,7 @@ app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder, IServiceScop
         try
         {
             using var scope = scopes.CreateScope(); //Fresh scope
-            var service = scope.ServiceProvider.GetRequiredService<IFulfilmentService>(); //Grab a fulfillment service
+            var service = scope.ServiceProvider.GetRequiredService<IFulfillmentService>(); //Grab a fulfillment service
             await service.FulfillBurstAsync(ids, appStopping);
         }catch(Exception ex)
         {
@@ -152,6 +131,46 @@ app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder, IServiceScop
             Log.Error(ex, "Burst Fulfillment failed");
         }
     }, appStopping);
+});
+
+//BenchMark - to check the differences between normal order after order and burst
+app.MapGet("/benchmark", async (int n, IFulfillmentService fs, ISeeder seeder, CancellationToken ct) =>
+{
+    //Create orders sequantial
+    var ordersSequential = seeder.SeeOrders(n, false);//Orders ids
+    //Stop watch to time sequantial
+    Stopwatch sw1 = new Stopwatch();
+    //Start watch
+    sw1.Start();
+    //Start orders
+    
+
+    foreach(var order in ordersSequential)
+    {
+        await fs.FulfillOneAsync(order, ct);
+    }
+    //Stop watch
+    sw1.Stop();
+
+    //Create orders burst
+    var ordersBurst = seeder.ResetAndCreateOrders(n);
+    //Stop watch to time burst
+    Stopwatch sw2 = new Stopwatch();
+    sw2.Start();
+    await fs.FulfillBurstAsync(ordersBurst, ct);
+    sw2.Stop();
+
+    double speedupA = (double)sw1.ElapsedMilliseconds/sw2.ElapsedMilliseconds;
+
+    Log.Information("Total orders {n}, Sequential time : {st}, Burst time {bt}", n, sw1.ElapsedMilliseconds,sw2.ElapsedMilliseconds);
+    //Return results
+    return new
+    {
+        sequential = sw1.ElapsedMilliseconds,
+        burst = sw2.ElapsedMilliseconds,
+        speedup = speedupA
+    };
+    
 });
 
 app.Run(); //API RUN

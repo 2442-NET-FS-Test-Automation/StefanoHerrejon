@@ -7,7 +7,7 @@ using Serilog;
 
 namespace Fulfillment.Api.Fulfillment;
 
-public interface IFulfilmentService //Interface for fulfillment service
+public interface IFulfillmentService //Interface for fulfillment service
 {
     public Task<FulfillmentResult> FulfillOneAsync(int orderId, CancellationToken ct);
 
@@ -22,7 +22,7 @@ public enum FulfillmentResult{Fulfilled, Backordered}
 public record BurstResult(int Fulfilled, int BackOrdered);
 
 //Class for fulfillment service aka post orders, and fulfillment
-public class FulfillmentService : IFulfilmentService
+public class FulfillmentService : IFulfillmentService
 {
     private readonly IDbContextFactory<FulfillmentDBContext> _factory;
 
@@ -111,6 +111,7 @@ public class FulfillmentService : IFulfilmentService
             try
             {   //try to save the changes on inventory.ticket.QuantityOnHand, new Fulfillment event, update order.status&completedUtc
                 //Checks row version 
+                
                 await db.SaveChangesAsync(ct); 
                 return true; //This break the while, happy ending
             }
@@ -118,6 +119,7 @@ public class FulfillmentService : IFulfilmentService
             {
                 //Retry logic
                 //Entry is EF Core Change tracker
+                Log.Warning("Fail to save to db.");
                 foreach(var entry in ex.Entries)
                 {
                     var current = await entry.GetDatabaseValuesAsync();//Grab the current db value
@@ -151,10 +153,10 @@ public class FulfillmentService : IFulfilmentService
         }
 
         //Using BurstPlanner to order order based on priority
-        var planner = _planner.OrderByPriority(orders);
+        var planned = _planner.OrderByPriority(orders);
 
         //Using prev logic to complete a single order
-        var tasks = orderIds.Select(id => FulfillOneAsync(id, ct));
+        var tasks = planned.Select(id => FulfillOneAsync(id, ct));
 
         //Await here until all orders are completed
         var results = await Task.WhenAll(tasks);

@@ -8,6 +8,7 @@ public interface ISeeder
     IReadOnlyList<int> SeeOrders(int n, bool expedited);
 
     IReadOnlyList<int> ResetAndCreateOrders(int n);
+    
 }
 
 public class Seeder : ISeeder
