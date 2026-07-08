@@ -44,14 +44,14 @@ public class FulfillmentService : IFulfillmentService
 
         var order = await db.Orders.Include(a => a.Lines).FirstAsync(a => a.Id == orderId, ct); //Grab the order from the dbContext vai orderId
 
-        var requested = order.Lines.ToDictionary(l => l.ProductId, l => l.Quantity);
+        var requested = order.Lines.ToDictionary(l => l.TicketId, l => l.Quantity);
 
         bool canFulfill = true; //Flag for "can I continue fulfillinf the order"
 
         foreach(OrderLines line in order.Lines)
         {
             //We grab the current inventory from the ticket we want to buy
-            TicketItem inv = await db.Inventory.FirstAsync(i => i.TicketId == line.ProductId, ct);
+            TicketItem inv = await db.Inventory.FirstAsync(i => i.TicketId == line.TicketId, ct);
 
             //We check if we can fulfilled the order due to number of tickets
             if(inv.QuantityOnHand < line.Quantity)
@@ -70,7 +70,7 @@ public class FulfillmentService : IFulfillmentService
             //We set the order Status as Backordered
             order.Status = Status.Backordered; 
             //We create a fail/backordered fulfillment event
-            db.FUlfillmentEvents.Add(new FUlfillmentEvent{OrderId = orderId, Type = "Backordered", Message="Not enough inventory"});
+            db.FulfillmentEvents.Add(new FulfillmentEvent{OrderId = orderId, Type = "Backordered", Message="Not enough inventory"});
             //We make the changes (Add Order update & FulfillmentEvent new add) to the db via db>_factory
             await db.SaveChangesAsync(ct);
             //Log the success
@@ -84,7 +84,7 @@ public class FulfillmentService : IFulfillmentService
         order.Status = Status.Fulfilled; //Order Status = Fulfilled
         order.CompletedUtc = DateTime.UtcNow; //Fill order.CompletedUtc as now
         //We add to the fulfillmentEvents table a new record, indicating the success
-        db.FUlfillmentEvents.Add(new FUlfillmentEvent{OrderId = orderId, Type = "Fulfilled", Message ="Enough inventory"});
+        db.FulfillmentEvents.Add(new FulfillmentEvent{OrderId = orderId, Type = "Fulfilled", Message ="Enough inventory"});
 
         //Lets try to save the changes to the db
         if(!await SaveWithRetryAsync(db, requested, ct)) //If we get a false from the function, meaning impossible to save changes

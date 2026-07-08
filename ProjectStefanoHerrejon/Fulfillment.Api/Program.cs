@@ -100,7 +100,7 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<Fulfil
     {
         CustomerId = orderRequest.CustomerId,
         Priority = Priority.Normal,
-        Lines = {new OrderLines{ProductId = orderRequest.ProductId, Quantity = orderRequest.Quantity}}
+        Lines = {new OrderLines{TicketId = orderRequest.ProductId, Quantity = orderRequest.Quantity}}
     };
 
     db.Orders.Add(newOrder); //Add new Order

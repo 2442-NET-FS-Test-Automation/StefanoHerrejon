@@ -24,7 +24,7 @@ public class FulfillmentDBContext : DbContext
 
     public DbSet<OrderLines> OrderLines => Set<OrderLines>();
 
-    public DbSet<FUlfillmentEvent> FUlfillmentEvents {get;set;}
+    public DbSet<FulfillmentEvent> FulfillmentEvents {get;set;}
 
     //OnModelCreating, for constraints, mapping column name and types
     //inside of here using something called Fluent API. EF core lest you do config in 3 ways. 
@@ -45,6 +45,16 @@ public class FulfillmentDBContext : DbContext
 
         mb.Entity<Customer>().Property(c=>c.Email).HasMaxLength(256); //Length of email on Customer
         mb.Entity<Customer>().HasIndex(c=>c.Email).IsUnique();//Customer>Email is unique
+        
+        mb.Entity<Order>() //1 fulfillment event per order
+            .HasOne(o => o.FulfillmentEvent)
+            .WithOne(f => f.Order)
+            .HasForeignKey<FulfillmentEvent>(f => f.OrderId);
+
+        mb.Entity<Order>() //n orders per 1 customer
+            .HasOne(o => o.Customer)
+            .WithMany(c => c.Orders)
+            .HasForeignKey(o => o.CustomerId);
 
         //Seed Data
         mb.Entity<Ticket>().HasData(//Id, Sku, Name, Price, 

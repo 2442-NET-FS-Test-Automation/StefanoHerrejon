@@ -40,7 +40,7 @@ public class Seeder : ISeeder
             {
                 CustomerId = Random.Shared.Next(1,3), //Random number representing the customer
                 Priority = expedited ? Priority.Expidited : Priority.Normal, //IS it expedited or normal order? Depende on argument send
-                Lines = {new OrderLines{ProductId = pid[Skus[i%Skus.Length]], Quantity = Random.Shared.Next(1,5)}}
+                Lines = {new OrderLines{TicketId = pid[Skus[i%Skus.Length]], Quantity = Random.Shared.Next(1,5)}}
             };
             db.Orders.Add(order); //Add new Order to DB
             db.SaveChanges(); //Save changes to db
@@ -84,7 +84,7 @@ public class Seeder : ISeeder
             {
                 CustomerId = Random.Shared.Next(1,3),
                 Priority = i % 3 == 0 ? Priority.Expidited:Priority.Normal,
-                Lines = {new OrderLines{ProductId = pid[new []{"TKT-1001","TKT-1002","TKT-1003"}[i%3]], Quantity = 1}}
+                Lines = {new OrderLines{TicketId = pid[new []{"TKT-1001","TKT-1002","TKT-1003"}[i%3]], Quantity = 1}}
             };
             db.Orders.Add(order);
             db.SaveChanges();
