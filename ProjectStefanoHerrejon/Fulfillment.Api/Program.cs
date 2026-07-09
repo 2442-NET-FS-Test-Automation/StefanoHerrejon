@@ -6,6 +6,7 @@ using Fulfillment.Api.Fulfillment;
 using Fulfillment.Data.Enums;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Fulfillment.Api.Exceptions;
 //API
 //Register things with the builder
 
@@ -18,9 +19,10 @@ var builder = WebApplication.CreateBuilder(args);
 var conn_string ="Server=localhost,1433;Database=SHFullFillment;User Id=sa; Password=LibraryPassword1; TrustServerCertificate=true";
 
 //Serilog Area
+var logFile = $"log/fulfillment-{DateTime.Now:yyyyMMdd-HHmmss}.txt"; //For 1 log per execution
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console() //Write to console
-    .WriteTo.File("log/fulfillment-log.txt", rollingInterval:RollingInterval.Day)//Write to file, new log file every day
+    .WriteTo.File(logFile)//Write to file, new log file every execution, name based on time it started execution
     .CreateLogger();
 builder.Host.UseSerilog();//Builder is told we are using serilog for logging
 
@@ -37,6 +39,7 @@ builder.Services.AddDbContextFactory<FulfillmentDBContext>(Options => Options.Us
 builder.Services.AddScoped<IFulfillmentService, FulfillmentService>(); //Fulfillment service
 builder.Services.AddScoped<ISeeder, Seeder>();
 builder.Services.AddScoped<BurstPlanner>();
+builder.Services.AddScoped<IOrderService,OrderService>();
 
 //Swagger stuff
 builder.Services.AddEndpointsApiExplorer();
@@ -50,7 +53,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 //Hello world
-app.MapGet("/", () => "Hello World!");
+app.MapGet("/", () => "Welcome to Stefano's DEMO!!!");
 
 //Get all items
 app.MapGet("/inventory", async (FulfillmentDBContext db, ILogger<Program> logger) =>
@@ -60,10 +63,10 @@ app.MapGet("/inventory", async (FulfillmentDBContext db, ILogger<Program> logger
 });
 
 //Reset inventory endpoint
-app.MapGet("/inventory/reset", (FulfillmentDBContext db, ILogger<Program> logger) =>
+app.MapGet("/inventory/reset", (FulfillmentDBContext db) =>
 {
     //Serilog
-    logger.LogInformation("Start of reseting DB");
+    Log.Logger.Information("Start of reseting DB");
 
     //Reset default items/Seeding
     foreach(TicketItem inv in db.Inventory)
@@ -85,8 +88,79 @@ app.MapGet("/inventory/reset", (FulfillmentDBContext db, ILogger<Program> logger
     }
 
     db.SaveChanges(); //Save to DB
-    logger.LogInformation("Stock restock to default");
+    Log.Logger.Information("Stock restock to default");
     return Results.Ok("Stock reset");
+});
+
+//Get number of fulfilled orders and backordered all time
+app.MapGet("/orders-all-time", async (IOrderService orderService, CancellationToken ct) =>
+{
+    var report = await orderService.OrdersAllTime(ct);
+    return Results.Ok(report);
+});
+
+//Get number of fulfilled orders and backordered all time
+app.MapGet("/orders-today", async (IOrderService orderService, CancellationToken ct) =>
+{
+    var report = await orderService.OrdersToday(ct);
+    return Results.Ok(report);
+});
+
+//Orders by client, count, all orders ? Both
+//Clients history, total Count, fulfilled, backorderd, 
+app.MapGet("/orders-by-client", async (IOrderService orderService, CancellationToken ct) =>
+{
+    var report = await orderService.OrdersByClient(ct);
+    return Results.Ok(report);
+});
+
+//Orders by specific client
+app.MapGet("/orders-history-client", async (int clientNumber, IOrderService orderService, CancellationToken ct) =>
+{
+     List<Fulfillment.Api.Fulfillment.OrdersSingleClient>report = [];
+    try
+    {
+        report = await orderService.OrderHistory(clientNumber, ct);
+    }catch(ClientNotFoundException ex)
+    {
+        Log.Logger.Error("No client with clientId {clientId}, message: {message}.", ex.ClientId, ex.Message);
+    }catch(Exception ex)
+    {
+        Log.Logger.Error("No client with clientId {clientId}, message: {message}.", clientNumber, ex.Message);
+    }
+    
+    return report;
+});
+
+//Get Pending orders
+app.MapGet("orders/pending", (FulfillmentDBContext db, CancellationToken ct) =>
+{
+    int count = 0;
+    foreach(var inv in db.Orders)
+    {
+        if(inv.Status == Status.Pending)
+        {
+            count+=1;
+        }
+    }
+
+    return count;
+});
+
+//Get Pending orders
+app.MapGet("orders/deletePending", async (FulfillmentDBContext db, CancellationToken ct) =>
+{
+    int count = 0;
+    foreach(var inv in db.Orders)
+    {
+        if(inv.Status == Status.Pending)
+        {
+            db.Orders.Remove(inv);
+        }
+    }
+    await db.SaveChangesAsync();
+
+    return count;
 });
 
 
@@ -110,7 +184,6 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<Fulfil
     var result = await fsvc.FulfillOneAsync(newOrder.Id, ct);
     return Results.Ok(new{orderId = newOrder.Id, result = result.ToString()});
 });
-
 
 //Burst EndPoint
 app.MapGet("/orders/burst", (int n, bool expedited, ISeeder seeder, IServiceScopeFactory scopes, IHostApplicationLifetime lifetime) =>
@@ -164,6 +237,9 @@ app.MapGet("/benchmark", async (int n, IFulfillmentService fs, ISeeder seeder, C
 
     Log.Information("Total orders {n}, Sequential time : {st}, Burst time {bt}", n, sw1.ElapsedMilliseconds,sw2.ElapsedMilliseconds);
     //Return results
+    //= 1.0	No improvement. Both implementations took the same time.
+    //> 1.0	The parallel version is faster.
+    //< 1.0	The parallel version is slower than the sequential version.
     return new
     {
         sequential = sw1.ElapsedMilliseconds,
@@ -172,6 +248,7 @@ app.MapGet("/benchmark", async (int n, IFulfillmentService fs, ISeeder seeder, C
     };
     
 });
+
 
 app.Run(); //API RUN
 Log.CloseAndFlush(); //Close Loggs

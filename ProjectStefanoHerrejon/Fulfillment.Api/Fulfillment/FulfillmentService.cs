@@ -1,6 +1,7 @@
 using System.Data;
 using Fulfillment.Data;
 using Fulfillment.Data.Entities;
+using Fulfillment.Api.Exceptions;
 using Fulfillment.Data.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -57,6 +58,12 @@ public class FulfillmentService : IFulfillmentService
             if(inv.QuantityOnHand < line.Quantity)
             {
                 canFulfill = false; //We have less tickets that they want to buy
+                //Exception
+                //Logs
+                //new FulfillmentEvent
+                //Class = status, completedUtc
+                //throw new InsufficienStockException(orderId,  line.Id,inv.QuantityOnHand, line.Quantity);
+                //This will break the logic of the calling method
                 break;
             }
 
@@ -69,6 +76,7 @@ public class FulfillmentService : IFulfillmentService
         {
             //We set the order Status as Backordered
             order.Status = Status.Backordered; 
+            order.CompletedUtc = DateTime.UtcNow;
             //We create a fail/backordered fulfillment event
             db.FulfillmentEvents.Add(new FulfillmentEvent{OrderId = orderId, Type = "Backordered", Message="Not enough inventory"});
             //We make the changes (Add Order update & FulfillmentEvent new add) to the db via db>_factory
@@ -92,7 +100,9 @@ public class FulfillmentService : IFulfillmentService
             db.ChangeTracker.Clear();
             Order staleOrder = await db.Orders.FirstAsync(a => a.Id == orderId, ct);
             staleOrder.Status = Status.Backordered;
+            staleOrder.CompletedUtc = DateTime.UtcNow;
             Log.Warning("Backordered order:{orderid} after concurrency retry", orderId); //Log unsucessfull save to db
+            await db.SaveChangesAsync(ct);
             return FulfillmentResult.Backordered; //Return baackordered
         }
 

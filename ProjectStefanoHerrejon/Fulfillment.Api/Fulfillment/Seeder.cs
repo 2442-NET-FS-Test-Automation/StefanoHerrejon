@@ -76,13 +76,13 @@ public class Seeder : ISeeder
         db.SaveChanges(); //Save reset to db
         var pid = db.Tickets.ToDictionary(p => p.Sku, p => p.Id); 
 
-        var ids = new List<int>(n); 
+        var ids = new List<int>(n);
 
         for(int i = 0; i < n; i++)
         {
             var order = new Order
             {
-                CustomerId = Random.Shared.Next(1,3),
+                CustomerId = Random.Shared.Next(1,4),
                 Priority = i % 3 == 0 ? Priority.Expidited:Priority.Normal,
                 Lines = {new OrderLines{TicketId = pid[new []{"TKT-1001","TKT-1002","TKT-1003"}[i%3]], Quantity = 1}}
             };
