@@ -41,9 +41,11 @@ public class FulfillmentService : IFulfillmentService
 
     public async Task<FulfillmentResult> FulfillOneAsync(int orderId, CancellationToken ct)
     {
+        Log.Information("Starting order ={OrderId}", orderId);
         await using var db = await _factory.CreateDbContextAsync(ct); //Db context through Constructor/properties
 
         var order = await db.Orders.Include(a => a.Lines).FirstAsync(a => a.Id == orderId, ct); //Grab the order from the dbContext vai orderId
+        //Log.Information("Starting order {OrderId}, Priority : {Priority}", orderId, order.Priority);
 
         var requested = order.Lines.ToDictionary(l => l.TicketId, l => l.Quantity);
 
@@ -82,7 +84,7 @@ public class FulfillmentService : IFulfillmentService
             //We make the changes (Add Order update & FulfillmentEvent new add) to the db via db>_factory
             await db.SaveChangesAsync(ct);
             //Log the success
-            Log.Warning("BackOrdered {orderId}: insufficient stock",orderId); //Not enough stock warning
+            Log.Warning("Finish Order {orderId}, Status : BackOrdered, insufficient stock",orderId); //Not enough stock warning
             //Return task enum
             return FulfillmentResult.Backordered; //Return backordered
 
@@ -101,12 +103,12 @@ public class FulfillmentService : IFulfillmentService
             Order staleOrder = await db.Orders.FirstAsync(a => a.Id == orderId, ct);
             staleOrder.Status = Status.Backordered;
             staleOrder.CompletedUtc = DateTime.UtcNow;
-            Log.Warning("Backordered order:{orderid} after concurrency retry", orderId); //Log unsucessfull save to db
+            Log.Warning("Finish Order {orderId}, Status : Backordered  after concurrency retry", orderId); //Log unsucessfull save to db
             await db.SaveChangesAsync(ct);
             return FulfillmentResult.Backordered; //Return baackordered
         }
 
-        Log.Information("Fulfilled order:{orderId}, {LineCount} lines", orderId,order.Lines.Count); //Logging success
+        Log.Information("Finish Order {orderId}, Status : Fulfilled {LineCount} lines", orderId,order.Lines.Count); //Logging success
         return FulfillmentResult.Fulfilled; //Fulfilled order
 
     }
@@ -153,6 +155,7 @@ public class FulfillmentService : IFulfillmentService
 
     public async Task<BurstResult> FulfillBurstAsync(IEnumerable<int> orderIds, CancellationToken ct)
     {
+        Log.Information("Start FulfillBurstAsync");
         List<int> idList = orderIds.ToList();//Grabing all ordersIds
 
         List<Order> orders; //List to store my orders
@@ -171,6 +174,7 @@ public class FulfillmentService : IFulfillmentService
         //Await here until all orders are completed
         var results = await Task.WhenAll(tasks);
 
+        Log.Information("End FulfillBurstAsync");
         return new BurstResult(
             Fulfilled : results.Count(r => r == FulfillmentResult.Fulfilled),
             BackOrdered : results.Count(r => r == FulfillmentResult.Backordered)

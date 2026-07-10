@@ -53,21 +53,20 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 //Hello world
-app.MapGet("/", () => "Welcome to Stefano's DEMO!!!");
+app.MapGet("/", () => 
+{
+    return "Welcome to Stefano's DEMO!!!";
+});
 
 //Get all items
 app.MapGet("/inventory", async (FulfillmentDBContext db, ILogger<Program> logger) =>
 {
-    logger.LogInformation("Endpoint Inventory");
     return await db.Inventory.ToListAsync();
 });
 
 //Reset inventory endpoint
 app.MapGet("/inventory/reset", (FulfillmentDBContext db) =>
 {
-    //Serilog
-    Log.Logger.Information("Start of reseting DB");
-
     //Reset default items/Seeding
     foreach(TicketItem inv in db.Inventory)
     {
@@ -159,10 +158,10 @@ app.MapGet("orders/deletePending", async (FulfillmentDBContext db, CancellationT
         }
     }
     await db.SaveChangesAsync();
+    Log.Logger.Information("Pending Orders deleted");
 
     return count;
 });
-
 
 //Quick Method to fulfill an order
 app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<FulfillmentDBContext> factory, 
@@ -215,8 +214,7 @@ app.MapGet("/benchmark", async (int n, IFulfillmentService fs, ISeeder seeder, C
     Stopwatch sw1 = new Stopwatch();
     //Start watch
     sw1.Start();
-    //Start orders
-    
+    //Start orders 
 
     foreach(var order in ordersSequential)
     {
@@ -247,6 +245,39 @@ app.MapGet("/benchmark", async (int n, IFulfillmentService fs, ISeeder seeder, C
         speedup = speedupA
     };
     
+});
+
+//BenchMark for PriorityQueue
+app.MapGet("/benchmark-PQ", async (int n, FulfillmentDBContext db,IFulfillmentService fs, ISeeder seeder, CancellationToken ct) =>
+{
+    Log.Information("benchmark-PQ started");
+
+    var ordersBurst = seeder.ResetAndCreateOrders(n);
+
+    await fs.FulfillBurstAsync(ordersBurst, ct);
+
+    var report = await db.Orders
+        .Where(o => ordersBurst.Contains(o.Id)).OrderByDescending(o => o.Priority)
+        .Select(o => new {Id = o.Id,Priority = o.Priority.ToString(), CompletedAt = o.CompletedUtc })
+        .ToListAsync(ct);
+
+    Log.Information("Total orders for benchmark-pq {n}", n);
+    
+    return report;//Return results
+    
+});
+
+
+//Safe exit
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    Log.Information("Application is stopping...");
+});
+
+app.Lifetime.ApplicationStopped.Register(() =>
+{
+    Log.Information("Application stopped.");
+    Log.CloseAndFlush();
 });
 
 

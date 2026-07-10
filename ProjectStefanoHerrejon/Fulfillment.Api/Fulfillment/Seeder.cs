@@ -2,6 +2,7 @@ using Fulfillment.Data;
 using Fulfillment.Data.Entities;
 using Fulfillment.Data.Enums;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 public interface ISeeder
 {
@@ -38,7 +39,7 @@ public class Seeder : ISeeder
         {
             var order = new Order
             {
-                CustomerId = Random.Shared.Next(1,3), //Random number representing the customer
+                CustomerId = Random.Shared.Next(1,4), //Random number representing the customer
                 Priority = expedited ? Priority.Expidited : Priority.Normal, //IS it expedited or normal order? Depende on argument send
                 Lines = {new OrderLines{TicketId = pid[Skus[i%Skus.Length]], Quantity = Random.Shared.Next(1,5)}}
             };
@@ -46,6 +47,8 @@ public class Seeder : ISeeder
             db.SaveChanges(); //Save changes to db
             ids.Add(order.Id);
         }
+
+        Log.Information("New orders created, Quantity : {Quantity}",n );
         return ids;
     }
 
@@ -83,7 +86,7 @@ public class Seeder : ISeeder
             var order = new Order
             {
                 CustomerId = Random.Shared.Next(1,4),
-                Priority = i % 3 == 0 ? Priority.Expidited:Priority.Normal,
+                Priority = i % 2 == 0 ? Priority.Expidited:Priority.Normal,
                 Lines = {new OrderLines{TicketId = pid[new []{"TKT-1001","TKT-1002","TKT-1003"}[i%3]], Quantity = 1}}
             };
             db.Orders.Add(order);
