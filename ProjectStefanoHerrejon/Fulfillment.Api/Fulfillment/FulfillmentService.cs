@@ -41,7 +41,7 @@ public class FulfillmentService : IFulfillmentService
 
     public async Task<FulfillmentResult> FulfillOneAsync(int orderId, CancellationToken ct)
     {
-        Log.Information("Starting order ={OrderId}", orderId);
+        Log.Information("Starting order = {OrderId} at {timestamp}", orderId, DateTime.Now);
         await using var db = await _factory.CreateDbContextAsync(ct); //Db context through Constructor/properties
 
         var order = await db.Orders.Include(a => a.Lines).FirstAsync(a => a.Id == orderId, ct); //Grab the order from the dbContext vai orderId
@@ -87,7 +87,7 @@ public class FulfillmentService : IFulfillmentService
             //We make the changes (Add Order update & FulfillmentEvent new add) to the db via db>_factory
             await db.SaveChangesAsync(ct);
             //Log the success
-            Log.Warning("Finish Order {orderId}, Status : BackOrdered, insufficient stock",orderId); //Not enough stock warning
+            Log.Warning("Finish Order {orderId}, Status : BackOrdered, insufficient stock, time : {time}",orderId, DateTime.Now); //Not enough stock warning
             //Return task enum
             return FulfillmentResult.Backordered; //Return backordered
 
@@ -106,12 +106,12 @@ public class FulfillmentService : IFulfillmentService
             Order staleOrder = await db.Orders.FirstAsync(a => a.Id == orderId, ct);
             staleOrder.Status = Status.Backordered;
             staleOrder.CompletedUtc = DateTime.UtcNow;
-            Log.Warning("Finish Order {orderId}, Status : Backordered  after concurrency retry", orderId); //Log unsucessfull save to db
+            Log.Warning("Finish Order {orderId}, Status : Backordered  after concurrency retry at time: {time}", orderId, DateTime.Now); //Log unsucessfull save to db
             await db.SaveChangesAsync(ct);
             return FulfillmentResult.Backordered; //Return baackordered
         }
 
-        Log.Information("Finish Order {orderId}, Status : Fulfilled {LineCount} lines", orderId,order.Lines.Count); //Logging success
+        Log.Information("Finish Order {orderId}, Status : Fulfilled {LineCount} lines, at {time}", orderId,order.Lines.Count, DateTime.Now); //Logging success
         return FulfillmentResult.Fulfilled; //Fulfilled order
 
     }
