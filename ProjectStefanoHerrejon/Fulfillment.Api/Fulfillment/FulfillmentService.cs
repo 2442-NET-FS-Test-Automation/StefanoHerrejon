@@ -51,13 +51,16 @@ public class FulfillmentService : IFulfillmentService
 
         bool canFulfill = true; //Flag for "can I continue fulfillinf the order"
 
+        
+
         foreach(OrderLines line in order.Lines)
         {
             //We grab the current inventory from the ticket we want to buy
+
             TicketItem inv = await db.Inventory.FirstAsync(i => i.TicketId == line.TicketId, ct);
 
             //We check if we can fulfilled the order due to number of tickets
-            if(inv.QuantityOnHand < line.Quantity)
+            if(inv.QuantityOnHand < line.Quantity )
             {
                 canFulfill = false; //We have less tickets that they want to buy
                 //Exception

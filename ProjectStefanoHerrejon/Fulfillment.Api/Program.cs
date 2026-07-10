@@ -169,11 +169,14 @@ app.MapPost("/orders", async (OrderPayLoad orderRequest,IDbContextFactory<Fulfil
 {
     await using var db = await factory.CreateDbContextAsync(ct); 
 
+    if(orderRequest.CustomerId < 1 || orderRequest.CustomerId > 3|| orderRequest.TicketId <1 || orderRequest.TicketId >3)
+        return Results.NotFound("CustomerId or TicketId does not exist");
+
     var newOrder = new Order
     {
         CustomerId = orderRequest.CustomerId,
         Priority = Priority.Normal,
-        Lines = {new OrderLines{TicketId = orderRequest.ProductId, Quantity = orderRequest.Quantity}}
+        Lines = {new OrderLines{TicketId = orderRequest.TicketId, Quantity = orderRequest.Quantity}}
     };
 
     db.Orders.Add(newOrder); //Add new Order
@@ -395,7 +398,7 @@ app.Lifetime.ApplicationStopped.Register(() =>
 
 app.Run(); //API RUN
 Log.CloseAndFlush(); //Close Loggs
-public record OrderPayLoad(int ProductId, int Quantity, int CustomerId);
+public record OrderPayLoad(int TicketId, int Quantity, int CustomerId);
 public record TopProducts(
     int TicketID,
     int TotalSold,
