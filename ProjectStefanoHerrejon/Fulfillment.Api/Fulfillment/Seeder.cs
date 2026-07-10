@@ -41,7 +41,7 @@ public class Seeder : ISeeder
             {
                 CustomerId = Random.Shared.Next(1,4), //Random number representing the customer
                 Priority = expedited ? Priority.Expidited : Priority.Normal, //IS it expedited or normal order? Depende on argument send
-                Lines = {new OrderLines{TicketId = pid[Skus[i%Skus.Length]], Quantity = Random.Shared.Next(1,5)}}
+                Lines = {new OrderLines{TicketId = pid[Skus[i%Skus.Length]], Quantity = 1}}
             };
             db.Orders.Add(order); //Add new Order to DB
             db.SaveChanges(); //Save changes to db
@@ -77,7 +77,7 @@ public class Seeder : ISeeder
         }
 
         db.SaveChanges(); //Save reset to db
-        var pid = db.Tickets.ToDictionary(p => p.Sku, p => p.Id); 
+        var pid = db.Tickets.ToDictionary(p => p.Sku, p => p.Id);
 
         var ids = new List<int>(n);
 

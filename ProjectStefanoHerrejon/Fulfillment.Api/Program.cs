@@ -268,6 +268,118 @@ app.MapGet("/benchmark-PQ", async (int n, FulfillmentDBContext db,IFulfillmentSe
 });
 
 
+//Top Selling products from a new query
+app.MapGet("/TopSellingProducts-NewOrders", async (int n, FulfillmentDBContext db, IFulfillmentService fs, ISeeder seeder,CancellationToken ct) =>
+{
+    //Check the most sold tickets
+    //Binary Search for rank
+
+    Log.Information("benchmark-Report started");
+    //Reset inventory & make Orders
+    var ordersBurst = seeder.ResetAndCreateOrders(n);
+
+    //Complete orders
+    await fs.FulfillBurstAsync(ordersBurst, ct);
+
+    //Agruparlas por tickedId, solo aquellas que estan en ordersBurst;
+
+
+    var data = await db.OrderLines
+        .Where(ol => ordersBurst.Contains(ol.OrderId) && ol.Order.Status == Status.Fulfilled)
+        .GroupBy(o => o.TicketId)
+        .Select(g => new {
+            TicketId = g.Key,
+            TotalSold = g.Sum(x => x.Quantity)})
+        .ToListAsync(ct);
+
+    var report = data.Select((x, index)=> new TopProducts(x.TicketId, x.TotalSold, index+=1)).OrderByDescending(x => x.TotalSold).ToList();
+
+    return report;
+});
+
+//Top Selling products from all time
+app.MapGet("/TopSellingProducts", async (FulfillmentDBContext db, IFulfillmentService fs, ISeeder seeder,CancellationToken ct) =>
+{
+    //Check the most sold tickets
+    //Binary Search for rank
+
+    Log.Information("benchmark-Report started");
+    //Reset inventory & make Orders
+
+
+    //Agruparlas por tickedId, solo aquellas que estan en ordersBurst;
+
+
+    var data = await db.OrderLines
+        .Where(ol => db.Orders
+            .Any(o => o.Id == ol.OrderId && o.Status == Status.Fulfilled))
+        .GroupBy(ol => ol.TicketId)
+        .Select(g => new
+        {
+            TicketId = g.Key,
+            TotalSold = g.Sum(x => x.Quantity)
+        })
+        .OrderByDescending(x => x.TotalSold)
+        .ToListAsync(ct);
+
+    var report = data
+        .Select((x, index) => new TopProducts(
+            x.TicketId,
+            x.TotalSold,
+            index + 1))
+        .ToList();
+
+    return report;
+});
+
+//BenchMark for p7, Reports of most popular products from last orders
+app.MapGet("/benchmark-Reports", async (int topRank, FulfillmentDBContext db, IFulfillmentService fs, ISeeder seeder, CancellationToken ct) =>
+{
+    //Check the most sold tickets
+    //Binary Search for rank
+
+    Log.Information("benchmark-Report-Top");
+
+    var totals = await db.OrderLines
+        .Join(
+        db.Orders.Where(o => o.Status == Status.Fulfilled),
+        ol => ol.OrderId,
+        o => o.Id,
+        (ol, o) => ol)
+        .GroupBy(ol => ol.TicketId)
+        .Select(g => new
+        {
+            TicketId = g.Key,
+            TotalSold = g.Sum(x => x.Quantity)
+        })
+    .OrderByDescending(x => x.TotalSold)
+    .ToListAsync(ct);
+
+    var ranked = totals //rankThem based on totalSold and order from previous totals
+    .Select((x, index) => new TopProducts(
+        x.TicketId,
+        x.TotalSold,
+        index + 1))
+        .ToList();
+
+    var searchable = ranked
+        .OrderBy(x => x.TicketID)
+        .ToList();
+
+    int index = searchable.BinarySearch(
+    new TopProducts(topRank, 0, 0),
+        Comparer<TopProducts>.Create(
+        (a, b) => a.TicketID.CompareTo(b.TicketID)));
+
+    if (index >= 0)
+    {
+        var product = searchable[index];
+
+        return($"Ticket {product.TicketID} is ranked #{product.Rank} with totalsold : {product.TotalSold}");
+    }else return $"No ticket with rank : {topRank}";
+
+});
+
 //Safe exit
 app.Lifetime.ApplicationStopping.Register(() =>
 {
@@ -284,4 +396,8 @@ app.Lifetime.ApplicationStopped.Register(() =>
 app.Run(); //API RUN
 Log.CloseAndFlush(); //Close Loggs
 public record OrderPayLoad(int ProductId, int Quantity, int CustomerId);
+public record TopProducts(
+    int TicketID,
+    int TotalSold,
+    int Rank);
 
