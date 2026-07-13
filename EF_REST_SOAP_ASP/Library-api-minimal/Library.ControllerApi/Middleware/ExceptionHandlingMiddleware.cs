@@ -18,7 +18,7 @@ public class ExceptionHandlingMiddleware
 
     public async Task InvokeAsync(HttpContext ctx)
     {
-        try{await _next(ctx)}
+        try{await _next(ctx);}
         catch(Exception ex)
         {
             _log.LogError(ex,"Unhandle exception on {Path}", ctx.Request.Path);

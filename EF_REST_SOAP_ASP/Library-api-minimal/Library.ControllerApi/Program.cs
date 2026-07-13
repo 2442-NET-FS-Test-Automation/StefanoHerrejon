@@ -21,6 +21,20 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog(); //Tell the builder to use Serilog for logging
 
+//Adding CORs
+const string SpaCorsPolicy = "spa"; //string name for our policy
+
+builder.Services.AddCors(o=> o.AddPolicy(SpaCorsPolicy, p=>p
+    .WithOrigins("http://localhost:3000")
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+
+));
+
+//Adding out HTTPClient
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>(); //Could later swap for InventotyMagoRepo
+builder.Services.AddScoped<IInventoryService, InventoryService>(); 
+
 builder.Services.AddDbContextFactory<LibraryDbContext>(o => o.UseSqlServer(conn_string));
 
 //Registering our customer Repo and Service layer methods like we did before
@@ -39,6 +53,10 @@ builder.Services.AddOpenApi();
 //Adding swagger back
 //Swagger stuff added to builder
 builder.Services.AddSwaggerGen();
+
+//Adding caching
+builder.Services.AddMemoryCache(); //Adding cache-ing to our server
+builder.Services.AddResponseCaching(); //adding response cache-ing asking the front end to save request results
 
 var app = builder.Build();
 
@@ -81,6 +99,10 @@ app.Use(async(ctx, next) =>
     await next(ctx);
 });
 
+app.UseResponseCaching(); //Using the response cache middleware
+
+app.UseCors(SpaCorsPolicy); //using our policy, 
+
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
@@ -90,3 +112,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+Log.CloseAndFlush(); //Remember to close and flush the logs (serilog)
