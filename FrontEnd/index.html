@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> <!--These are HTML comments-->
+    <!--head contains metadata abouth the document
+    things like language, charsets, etc. Doesnt render-->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Catalog</title>
+</head>
+<body>
+    <!--Body contains stuff that does render. Typically (always) within HTML elements-->
+    <!--Some attributes are for css - class and id being the two that come to mind
+        id = unique. Only this element can be identyfied by this id. Class = a group of elements.
+        These class and id attributes can also be used by JS to target elements
+            and we will see that later this week-->
+    <header class="site-header">
+        <h1 id="heading">City Library</h1>
+        <nav>
+            <a href="index.html">Catalog</a><!--Elements can have attributes, like href
+                                                which lets your browser knoe what html 
+                                                page to load when you ckick the link-->
+            <a href = "login.html">Sign in</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="catalog"><!-- Some elements are self closing-->
+            <h2>Catalog</h2>
+            <div class="toolbar">
+                <!--our first input - a placeholder for searching te catalog-->
+                <label for="search">Search</label>
+                <input type="search" id="search" name="search" placeholder="title or SKU"><!--self closing-->
+                <span class="hint">try a SKU like BK-101</span>
+            </div>
+
+            <div class="cards" id="catalog-cards">
+                <article class="card">
+                    <h3>Clean Code</h3>
+                    <dl>
+                        <dt>SKU</dt><dd>BK-101</dd>
+                        <dt>Price</dt><dd>29.99</dd>
+                        <dt>In stock</dt><dd>12</dd>  
+                    </dl>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>City library</p>
+        
+    </footer>
+</body>
+</html>

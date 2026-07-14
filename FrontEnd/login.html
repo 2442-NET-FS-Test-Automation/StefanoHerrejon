@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Log in</title>
+    </head>
+    <body>
+        <header class="site-header">
+            <h1 id="heading">City Library</h1>
+            <nav>
+                <a href="index.html">Catalog</a><!--Elements can have attributes, like href
+                                                    which lets your browser knoe what html 
+                                                    page to load when you ckick the link-->
+                <a href = "login.html">Sign in</a>
+            </nav>
+        </header>
+            <h1>Welcome to the LOGIN</h1>
+        
+            <main>
+                <!--Forma are group of inputs we intend to bundle together to send a request (POST)
+                still used even with things like react - useful for grabbing multiple bits of user inputs
+                for use in JS or TS (like logging in with username + pass)-->
+                <form id="login-form" class="panel">
+                    <div><label for=""></label><input type="text"></div>
+                    <div><label for=""></label><input type="text"></div>
+                </form>
+                <fieldset>
+                    <div class="field">
+                        <label for="loan-limit"></label>
+
+                    </div>
+
+
+                    <div>
+                        <option>Central</option>
+                        <option>South</option>
+                    </div>
+                    <div class="field">
+                        <input type="checkbox" id="newslatter" name="newsletter" checked>
+                        <label for="newslatter">Email me the new Arrival newslatter</label>
+                    </div>
+
+                    <div class="field">
+                        <input type="radio" id="format-print" name="format" value="print" checked>
+                        <label for=""></label>
+                        <input type="radio" id="format-ebook" name="format" value="ebook">
+                        <label for="format-ebook">E-book</label>
+                    </div>
+                </fieldset>
+
+            <!--In line css -right on the element itself in a style attribute-->
+                <p style="color:red;"> This tag is in inline styles</p>
+                <p class="internal">This tag is internally styled from the "head" section</p>
+            </main>
+
+
+    </body>
+</html>

@@ -8,6 +8,8 @@ public class SuplierClient : ISupplierclient
     //This class will call can outside api using for client
 
     private readonly HttpClient _http; //Comes from APS.M
+    private record SupplierProduct(int Id, string Title, decimal Price);
+
 
     public SuplierClient(HttpClient http)
     {
@@ -24,7 +26,7 @@ public class SuplierClient : ISupplierclient
         //Check to make suer we dont have a nulll in data
         if(!int.TryParse(digits, out var id)) return null;//If our data string was empty, just return nul
 
-        var product = await _http.GetFromJsonAsync<ISupplierclient>($"producrs/{id}");
+        var product = await _http.GetFromJsonAsync<SupplierProduct>($"producrs/{id}");
 
         return product?.Price;
     }

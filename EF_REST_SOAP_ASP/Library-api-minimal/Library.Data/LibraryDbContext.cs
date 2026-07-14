@@ -22,8 +22,9 @@ public class LibraryDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLines> OrderLines => Set<OrderLines>();
+    public DbSet<FulFillmentEvent> FulFillmentEvents {get;set;} //DIffeerent syntax same result
 
-    public DbSet<FulFillmentEvent> FulFillmentEvents {get;set;}
+    public DbSet<User> Users => Set<User>();
 
 
     //If I wanto to do things like deeper configuration options or data seeding
@@ -59,6 +60,10 @@ public class LibraryDbContext : DbContext
         b.Entity<Customer>().Property(c => c.Email).HasMaxLength(256);//Setting Length of email first
         b.Entity<Customer>().HasIndex(c=> c.Email).IsUnique();
 
+        //User needs a unque username - best to use Fluent API
+        b.Entity<User>().HasIndex(u=>u.UserName).IsUnique();
+
+        
         //After you configured your entities (if you do any config in the override)
         //You can use OnModelCreating to seed data
         b.Entity<Product>().HasData(

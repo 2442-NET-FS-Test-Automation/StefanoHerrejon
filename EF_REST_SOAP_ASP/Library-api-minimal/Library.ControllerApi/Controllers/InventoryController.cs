@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Library.ControllerApi.Services;
 using AutoMapper;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController] //This annotation tells APS.NET to map this controller during app.MapControllers()
 [Route("api/[controller]")]
@@ -155,6 +156,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpDelete("{sku}")]
+    [Authorize(Roles = "admin")]
     public async Task<ActionResult> Delete(string sku)
     {
         bool isDeleted = await _service.RemoveAsync(sku);
@@ -169,9 +171,10 @@ public class InventoryController : ControllerBase
             //return StatusCode(404, "Not found"); Another option
     }
 
-        //New GET that uses that SupplierClient to call an outside API
+    //New GET that uses that SupplierClient to call an outside API
     //LocalHost:5173/api/Inventory/{sku}/supplier-price}
     [HttpGet("{sku}/supplier-price")]
+    [Authorize] //no valid token - returns a 401. No code ever run. Any role but "admin" = 401
     public async Task<IActionResult>GetSupplierPrice(string sku)
     {
         var price = await _supplier.GetListPriceAsync(sku);

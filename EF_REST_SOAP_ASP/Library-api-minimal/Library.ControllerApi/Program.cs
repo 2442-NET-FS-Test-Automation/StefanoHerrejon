@@ -6,6 +6,12 @@ using Serilog;
 using Library.Data.Enums;
 using Library.ControllerApi.Middleware;
 using Library.ControllerApi.Filters;
+using System.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Identity;
+using Library.Data.Entities;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,15 +37,44 @@ builder.Services.AddCors(o=> o.AddPolicy(SpaCorsPolicy, p=>p
 
 ));
 
-//Adding out HTTPClient
-builder.Services.AddScoped<IInventoryRepository, InventoryRepository>(); //Could later swap for InventotyMagoRepo
-builder.Services.AddScoped<IInventoryService, InventoryService>(); 
+//Validation side of JWT. Issuance llives in TokenService
+var jwtKey = builder.Configuration["Jwt:Key"]; //from appsettings.Development.json
+
+//Hardcoding the issuer and audience - these have to match the ones we set on the token
+const string jwtIssuer = "library-fulfillment";
+const string jwtAudience = "library-fulfillment-clients";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o=>o.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true, ValidIssuer = jwtIssuer,
+        ValidateAudience = true, ValidAudience = jwtAudience,
+        ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ValidateLifetime = true
+    });
+
+builder.Services.AddAuthorization(); //ges after authorization
+
+//Token Issuance is a plain injectable service. Its stateless so we can use a singleton
+builder.Services.AddSingleton<ITokenService, TokenService>();
+
+//Adding our httpClient
+builder.Services.AddHttpClient<ISupplierclient, ISupplierclient>(c => 
+    c.BaseAddress = new Uri("https://dummyjson.com/") // all calls append to this URL
+);
 
 builder.Services.AddDbContextFactory<LibraryDbContext>(o => o.UseSqlServer(conn_string));
 
-//Registering our customer Repo and Service layer methods like we did before
-builder.Services.AddScoped<IInventoryRepository, InventoryRepository>(); //Could later swap for inventoryMongoRepo
-builder.Services.AddScoped<IInventoryService, InventoryService>(); //Inventory service (Service Layer)
+// Adding the password hasher
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+//Adding out HTTPClient
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>(); //Could later swap for InventotyMagoRepo
+builder.Services.AddScoped<IInventoryService, InventoryService>(); 
+builder.Services.AddScoped<IUserService, UserService>();
+
+//Adding password hasher
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 //Adding our mapping profile for AutoMapper
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(MappingProfile).Assembly));
@@ -59,6 +94,28 @@ builder.Services.AddMemoryCache(); //Adding cache-ing to our server
 builder.Services.AddResponseCaching(); //adding response cache-ing asking the front end to save request results
 
 var app = builder.Build();
+
+//Seeding admins - cont do a plain INSERT INTO using SQL becouse I tont havea a hashed pasword
+//might be able to do it in libraryDBContext - would have to check how to do that
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+
+    //We want this to be idempotent. This block of code runs EVERY time the app stars
+    //BUT we only want to seed our admin once
+    if(!db.Users.Any(u => u.Role == "admin"))
+    {
+        var hasher = new PasswordHasher<User>();
+        var admin = new User {UserName = "ada", Role = "admin"};
+
+        //I should put that password  inside of some secret (non GH committed) file
+        admin.PasswordHash = hasher.HashPassword(admin, "pass123"); //Put this in a config file pls!
+
+        db.Users.Add(admin);
+        db.SaveChanges();
+
+    }
+}
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();//Wraps all middleware below it, catches their exceptions
 
@@ -101,13 +158,15 @@ app.Use(async(ctx, next) =>
 
 app.UseResponseCaching(); //Using the response cache middleware
 
-app.UseCors(SpaCorsPolicy); //using our policy, 
+app.UseCors(SpaCorsPolicy); //using our policy, with the CORS middleware
+
+//Must be in this ordr for Auth/Author
+app.UseAuthentication(); //read and validate the tokens -> set User
+app.UseAuthorization(); //enforces the [Authorize] / RequireAuthorization() decorators on endpoints
 
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
-
-app.UseAuthorization();
 
 app.MapControllers();
 
