@@ -16,7 +16,7 @@ using System.Diagnostics;
 var builder = WebApplication.CreateBuilder(args);
 
 //The first thing that we need is to give our builder a connection string to our database
-var conn_string ="Server=localhost,1433;Database=LibraryMinimalDb;User Id=sa; Password=LibraryPassword1; TrustServerCertificate=true";
+var conn_string ="Server=localhost,1433;Database=LibraryMinimalDb;User Id=sa; Password=LibraryPass1!; TrustServerCertificate=true";
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()//Write to console, and write to a file - starting a new file each day

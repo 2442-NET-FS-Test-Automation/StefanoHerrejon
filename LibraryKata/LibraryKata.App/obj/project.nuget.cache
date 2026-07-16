@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "MB3nUR7lM6c=",
+  "dgSpecHash": "YmpkvIX0Sao=",
   "success": true,
-  "projectFilePath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
+  "projectFilePath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\stefa\\.nuget\\packages\\serilog\\4.3.1\\serilog.4.3.1.nupkg.sha512",
     "C:\\Users\\stefa\\.nuget\\packages\\serilog.sinks.console\\6.1.1\\serilog.sinks.console.6.1.1.nupkg.sha512"

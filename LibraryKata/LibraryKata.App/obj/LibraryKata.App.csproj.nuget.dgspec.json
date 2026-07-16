@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj": {}
+    "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj": {}
   },
   "projects": {
-    "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj": {
+    "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj",
+        "projectUniqueName": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj",
         "projectName": "Library.Domain",
-        "projectPath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj",
+        "projectPath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj",
         "packagesPath": "C:\\Users\\stefa\\.nuget\\packages\\",
-        "outputPath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\obj\\",
+        "outputPath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\stefa\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -71,7 +71,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -349,14 +349,14 @@
         }
       }
     },
-    "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj": {
+    "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
+        "projectUniqueName": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
         "projectName": "LibraryKata.App",
-        "projectPath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
+        "projectPath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\LibraryKata.App.csproj",
         "packagesPath": "C:\\Users\\stefa\\.nuget\\packages\\",
-        "outputPath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\obj\\",
+        "outputPath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\LibraryKata.App\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\stefa\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -372,8 +372,8 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj": {
-                "projectPath": "D:\\RevatureCodigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj"
+              "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj": {
+                "projectPath": "C:\\Users\\stefa\\Codigo\\StefanoHerrejon\\LibraryKata\\Library.Domain\\Library.Domain.csproj"
               }
             }
           }
@@ -410,7 +410,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
